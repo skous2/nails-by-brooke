@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+:root {
+  --blush: oklch(80.8% 0.114 19.571);
+  --blush-dark: oklch(70% 0.12 19.571); /* a slightly deeper version for hover */
+}
+
+/* You can add global styles below if you want */
+/*
+body {
+  @apply bg-pink-100;
+}
+*/
