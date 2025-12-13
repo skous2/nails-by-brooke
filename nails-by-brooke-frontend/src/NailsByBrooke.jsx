@@ -15,6 +15,7 @@ import logo from './assets/nailsbybrooke.jpg';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+console.log('API_BASE_URL in frontend:', API_BASE_URL);
 
 const NailsByBrooke = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -49,6 +50,19 @@ const NailsByBrooke = () => {
   const [reportData, setReportData] = useState({ monthly: [], annual: [], year: new Date().getFullYear() });
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
+
+  const formatDate = (dateString) => {
+  if (!dateString) return '';
+
+  const date = new Date(dateString);
+
+    // Example format: January 15, 2026
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
 
   // ---------- API helper ----------
@@ -630,8 +644,8 @@ const NailsByBrooke = () => {
                           <p className="font-semibold text-stone-800">
                             {appt.client_name}
                           </p>
-                          <p className="text-xs text-stone-500">
-                            {appt.service} • {appt.appointment_date}
+                          <p className="text-sm text-gray-600">
+                            {appt.service} • {formatDate(appt.appointment_date)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -669,9 +683,16 @@ const NailsByBrooke = () => {
               <h2 className="text-2xl font-semibold text-stone-800">Clients</h2>
               <button
                 onClick={() => openModal('client')}
-                className="bg-[var(--blush)] text-white px-4 py-2 rounded-full flex items-center gap-2 hover:bg-[var(--blush-dark)] text-sm font-medium shadow-sm"
+                className="
+                  bg-[var(--blush)] text-white 
+                  px-3 py-1.5        /* smaller mobile padding */
+                  sm:px-4 sm:py-2    /* normal padding on tablet/desktop */
+                  rounded-full flex items-center gap-1.5 sm:gap-2 
+                  hover:bg-[var(--blush-dark)] 
+                  text-xs sm:text-sm font-medium shadow-sm
+                "
               >
-                <Plus size={18} /> Add Client
+                <Plus size={14} className="sm:size-18" /> Add Client
               </button>
             </div>
             {clients.length === 0 ? (
@@ -729,9 +750,16 @@ const NailsByBrooke = () => {
               </h2>
               <button
                 onClick={() => openModal('appointment')}
-                className="bg-[var(--blush)] text-white px-4 py-2 rounded-full flex items-center gap-2 hover:bg-[var(--blush-dark)] text-sm font-medium shadow-sm"
+                className="
+                  bg-[var(--blush)] text-white 
+                  px-3 py-1.5        /* smaller mobile padding */
+                  sm:px-4 sm:py-2    /* normal padding on tablet/desktop */
+                  rounded-full flex items-center gap-1.5 sm:gap-2 
+                  hover:bg-[var(--blush-dark)] 
+                  text-xs sm:text-sm font-medium shadow-sm
+                "
               >
-                <Plus size={18} /> Add Appointment
+                <Plus size={14} className="sm:size-18" /> Add Appointment
               </button>
             </div>
             {appointments.length === 0 ? (
@@ -762,9 +790,7 @@ const NailsByBrooke = () => {
                             <p className="text-sm text-stone-600">
                               {appt.service}
                             </p>
-                            <p className="text-xs text-stone-500">
-                              📅 {appt.appointment_date}
-                            </p>
+                            <p className="text-xs text-gray-500">📅 {formatDate(appt.appointment_date)}</p>
                             {appt.notes && (
                               <p className="text-sm text-stone-500 mt-1">
                                 {appt.notes}
@@ -920,8 +946,8 @@ const NailsByBrooke = () => {
                           <p className="font-semibold text-stone-800">
                             {appt.client_name}
                           </p>
-                          <p className="text-sm text-stone-600">
-                            {appt.service} • {appt.appointment_date}
+                          <p className="text-sm text-gray-600">
+                            {appt.service} • {formatDate(appt.appointment_date)}
                           </p>
                         </div>
                         <div className="text-right">
