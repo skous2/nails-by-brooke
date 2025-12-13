@@ -11,6 +11,7 @@ import {
   LogOut,
   BarChart3
 } from 'lucide-react';
+import logo from './assets/nailsbybrooke.jpg';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
@@ -421,8 +422,15 @@ const NailsByBrooke = () => {
       <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full border border-stone-200">
           <div className="text-center mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold text-rose-600 mb-2">💅 Nails by Brooke</h1>
-            <p className="text-gray-600">Sign in to manage your business</p>
+            <div className="flex flex-col items-center mb-2">
+              <img 
+                src={logo} 
+                alt="Nails by Brooke Logo" 
+                className="w-16 h-16 object-contain mb-2"
+              />
+              <h1 className="text-4xl font-bold text-[var(--blush)]">Nails by Brooke</h1>
+            </div>
+          <p className="text-gray-600">Sign in to manage your business</p>
           </div>
 
           {error && (
@@ -476,7 +484,17 @@ const NailsByBrooke = () => {
     <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100">
       <header className="bg-[var(--blush)] text-white shadow-md">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <h1 className="text-2xl sm:text-3xl font-bold">💅 Nails by Brooke</h1>
+          <div className="flex items-center gap-3">
+            <img 
+              src={logo} 
+              alt="Nails by Brooke Logo"
+              className="w-10 h-10 object-contain"
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Nails by Brooke
+            </h1>
+          </div>
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-rose-50/90">
               Welcome, {user && user.name}!
