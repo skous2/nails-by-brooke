@@ -12,10 +12,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+
+const allowedOrigins = [
+  'http://localhost:5173',        // Vite dev
+  process.env.FRONTEND_URL        // Vercel production domain (set on Render)
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, cb) => {
+    // Allow server-to-server requests (Postman, curl, no-browser requests)
+    if (!origin) return cb(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+
+    return cb(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
