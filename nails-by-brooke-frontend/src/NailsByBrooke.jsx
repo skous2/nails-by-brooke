@@ -9,7 +9,9 @@ import {
   Edit2,
   Trash2,
   LogOut,
+  BarChart3
 } from 'lucide-react';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
@@ -42,6 +44,11 @@ const NailsByBrooke = () => {
     paid: false,
     notes: '',
   });
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportData, setReportData] = useState({ monthly: [], annual: [], year: new Date().getFullYear() });
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+
 
   // ---------- API helper ----------
   const apiCall = async (endpoint, options = {}) => {
@@ -108,6 +115,13 @@ const NailsByBrooke = () => {
     }
   }, [isAuthenticated, token]);
 
+  //This might need to be moved.
+  useEffect(() => {
+    if (isAuthenticated && token && currentPage === 'reports') {
+      loadReport(reportYear);
+    }
+  }, [isAuthenticated, token, currentPage, reportYear]);
+
   const loadClients = async () => {
     try {
       const data = await apiCall('/clients');
@@ -127,6 +141,56 @@ const NailsByBrooke = () => {
       setError('Failed to load appointments');
     }
   };
+
+  const loadReport = async (year) => {
+    try {
+      setReportError('');
+      setReportLoading(true);
+
+      const data = await apiCall(`/reports/summary?year=${year}`);
+      setReportData({
+        monthly: data.monthly || [],
+        annual: data.annual || [],
+        year: data.year || year
+      });
+    } catch (err) {
+      console.error('Error loading report:', err);
+      setReportError('Failed to load report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const downloadReportPdf = async () => {
+    try {
+      setReportError('');
+
+      const response = await fetch(`${API_BASE_URL}/reports/summary/pdf?year=${reportYear}`, {
+        method: 'GET',
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download PDF');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nails-by-brooke-income-report-${reportYear}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      setReportError('Failed to download PDF');
+    }
+  };
+
 
   // ---------- Client CRUD ----------
   const addClient = async () => {
@@ -298,6 +362,21 @@ const NailsByBrooke = () => {
     .sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date))
     .slice(0, 5);
 
+  // Determine which years are available for Reports dropdown
+  const appointmentYears = Array.from(
+    new Set(
+      appointments
+        .filter(a => a.appointment_date)
+        .map(a => new Date(a.appointment_date).getFullYear())
+    )
+  ).sort((a, b) => a - b);
+
+  // Ensure at least current year if no data
+  if (appointmentYears.length === 0) {
+    appointmentYears.push(new Date().getFullYear());
+  }
+
+
   // ---------- Monthly summary ----------
   const monthlySummaryMap = appointments
     .filter((a) => a.paid && a.appointment_date)
@@ -437,6 +516,7 @@ const NailsByBrooke = () => {
               { id: 'clients', icon: Users, label: 'Clients' },
               { id: 'appointments', icon: Calendar, label: 'Appointments' },
               { id: 'transactions', icon: DollarSign, label: 'Transactions' },
+              { id: 'reports', icon: BarChart3, label: 'Reports' }
             ].map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
@@ -853,6 +933,141 @@ const NailsByBrooke = () => {
             )}
           </div>
         )}
+
+        {/* Reporting */}
+        {currentPage === 'reports' && (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-rose-700">Income Reports</h2>
+          <p className="text-sm text-gray-600">
+            Breakdown of paid appointments by month and year, with tips separated from service income.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <select
+            value={reportYear}
+            onChange={(e) => setReportYear(parseInt(e.target.value, 10))}
+            className="px-3 py-2 border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400"
+          >
+            {appointmentYears.map(y => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={downloadReportPdf}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+          >
+            <BarChart3 size={16} />
+            Download PDF
+          </button>
+        </div>
+      </div>
+
+      {reportError && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {reportError}
+        </div>
+      )}
+
+      {reportLoading ? (
+        <p className="text-gray-500">Loading report…</p>
+      ) : (
+        <div className="space-y-8">
+          {/* Monthly table */}
+          <div>
+            <h3 className="text-xl font-semibold text-rose-700 mb-3">
+              Monthly Summary for {reportData.year}
+            </h3>
+            {reportData.monthly.length === 0 ? (
+              <p className="text-gray-500 text-sm">
+                No paid appointments recorded for this year yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-rose-50 text-left">
+                      <th className="px-3 py-2 font-semibold text-gray-700">Month</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Service Income</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Tips</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.monthly.map((row) => {
+                      const monthName = new Date(reportData.year, row.month - 1, 1).toLocaleString(
+                        'default',
+                        { month: 'long' }
+                      );
+                      const service = parseFloat(row.service_total || 0);
+                      const tips = parseFloat(row.tip_total || 0);
+                      const total = parseFloat(row.grand_total || 0);
+                      return (
+                        <tr key={row.month} className="border-t border-rose-50">
+                          <td className="px-3 py-2">{monthName}</td>
+                          <td className="px-3 py-2">${service.toFixed(2)}</td>
+                          <td className="px-3 py-2">${tips.toFixed(2)}</td>
+                          <td className="px-3 py-2 font-semibold">${total.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Annual table */}
+          <div>
+            <h3 className="text-xl font-semibold text-rose-700 mb-3">
+              Annual Summary (All Years)
+            </h3>
+            {reportData.annual.length === 0 ? (
+              <p className="text-gray-500 text-sm">
+                No paid appointments recorded yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-rose-50 text-left">
+                      <th className="px-3 py-2 font-semibold text-gray-700">Year</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Service Income</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Tips</th>
+                      <th className="px-3 py-2 font-semibold text-gray-700">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.annual.map((row) => {
+                      const service = parseFloat(row.service_total || 0);
+                      const tips = parseFloat(row.tip_total || 0);
+                      const total = parseFloat(row.grand_total || 0);
+                      return (
+                        <tr key={row.year} className="border-t border-rose-50">
+                          <td className="px-3 py-2">{row.year}</td>
+                          <td className="px-3 py-2">${service.toFixed(2)}</td>
+                          <td className="px-3 py-2">${tips.toFixed(2)}</td>
+                          <td className="px-3 py-2 font-semibold">${total.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-500">
+            Note: Reports include only appointments marked as <span className="font-semibold">Paid</span>.
+          </p>
+        </div>
+      )}
+    </div>
+  )}
+
       </main>
 
       {/* ---------- Modal ---------- */}

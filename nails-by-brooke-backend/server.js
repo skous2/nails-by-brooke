@@ -7,6 +7,8 @@ const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
 const appointmentRoutes = require('./routes/appointments');
 const dashboardRoutes = require('./routes/dashboard');
+const reportRoutes = require('./routes/reports');  
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
