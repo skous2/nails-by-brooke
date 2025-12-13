@@ -16,7 +16,8 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 
 const allowedOrigins = [
-  'http://localhost:5173',        // Vite dev
+  'http://localhost:5173',       // Vite dev
+  'http://localhost:5174',        // Vite dev (Sometimes uses this port)
   process.env.FRONTEND_URL        // Vercel production domain (set on Render)
 ].filter(Boolean);
 
