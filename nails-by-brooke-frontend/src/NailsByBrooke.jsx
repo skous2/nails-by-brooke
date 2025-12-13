@@ -29,6 +29,10 @@ const NailsByBrooke = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [appointmentsClientFilter, setAppointmentsClientFilter] = useState('all');
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [clientForm, setClientForm] = useState({
@@ -345,25 +349,41 @@ const NailsByBrooke = () => {
     setShowModal(true);
   };
 
+  const openClientDetails = (client) => {
+    setSelectedClient(client);
+    setModalType('clientDetails');
+    setShowModal(true);
+  };
+
+  const openAppointmentDetails = (appt) => {
+    setSelectedAppointment(appt);
+    setModalType('appointmentDetails');
+    setShowModal(true);
+  };
+
   const closeModal = () => {
     setShowModal(false);
     setEditingId(null);
     setClientForm({ name: '', phone: '', email: '', notes: '' });
-    setApptForm({
-      client_id: '',
-      appointment_date: '',
-      service: '',
-      price: '',
-      tip: '',
-      paid: false,
-      notes: '',
-    });
+    setApptForm({ client_id: '', appointment_date: '', service: '', price: '', tip: '', paid: false, notes: '' });
+    setSelectedClient(null);
+    setSelectedAppointment(null);
   };
 
   // ---------- Derived totals ----------
   const totalEarnings = appointments
     .filter((a) => a.paid)
     .reduce((sum, a) => sum + parseFloat(a.price || 0) + parseFloat(a.tip || 0), 0);
+
+  const filteredAppointments = appointments.filter((appt) => {
+    if (appointmentsClientFilter === 'all') return true;
+    // compare as strings to avoid number/string mismatches
+    return String(appt.client_id) === String(appointmentsClientFilter);
+  });
+
+  const sortedFilteredAppointments = [...filteredAppointments].sort(
+    (a, b) => new Date(b.appointment_date) - new Date(a.appointment_date)
+  );
 
   const pendingPayments = appointments
     .filter((a) => !a.paid)
@@ -704,7 +724,12 @@ const NailsByBrooke = () => {
                 {clients.map((client) => (
                   <div
                     key={client.id}
-                    className="border border-stone-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
+                    onClick={() => openClientDetails(client)}
+                    className="
+                      border border-stone-200 rounded-lg p-4 
+                      hover:shadow-md transition-shadow 
+                      cursor-pointer bg-white
+                    "
                   >
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="text-lg font-semibold text-stone-800">
@@ -712,13 +737,19 @@ const NailsByBrooke = () => {
                       </h3>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => openModal('client', client)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal('client', client);
+                          }}
                           className="text-sky-600 hover:text-sky-800"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
-                          onClick={() => deleteClient(client.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteClient(client.id);
+                          }}
                           className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 size={16} />
@@ -730,7 +761,7 @@ const NailsByBrooke = () => {
                       <p className="text-sm text-stone-600">✉️ {client.email}</p>
                     )}
                     {client.notes && (
-                      <p className="text-sm text-stone-500 mt-2">
+                      <p className="text-sm text-stone-500 mt-2 line-clamp-2">
                         {client.notes}
                       </p>
                     )}
@@ -744,104 +775,150 @@ const NailsByBrooke = () => {
         {/* ---------- Appointments ---------- */}
         {currentPage === 'appointments' && (
           <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
-            <div className="flex justify-between items-center mb-6">
+            {/* Header + Filter Row */}
+            <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-semibold text-stone-800">
                 Appointments
               </h2>
-              <button
-                onClick={() => openModal('appointment')}
-                className="
-                  bg-[var(--blush)] text-white 
-                  px-3 py-1.5        /* smaller mobile padding */
-                  sm:px-4 sm:py-2    /* normal padding on tablet/desktop */
-                  rounded-full flex items-center gap-1.5 sm:gap-2 
-                  hover:bg-[var(--blush-dark)] 
-                  text-xs sm:text-sm font-medium shadow-sm
-                "
-              >
-                <Plus size={14} className="sm:size-18" /> Add Appointment
-              </button>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                {/* Client Filter Dropdown */}
+                <select
+                  value={appointmentsClientFilter}
+                  onChange={(e) => setAppointmentsClientFilter(e.target.value)}
+                  className="
+                    px-3 py-2 border border-stone-300 rounded-lg
+                    text-sm focus:outline-none focus:ring-2
+                    focus:ring-[var(--blush)]
+                  "
+                >
+                  <option value="all">All clients</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Add Appointment Button */}
+                <button
+                  onClick={() => openModal('appointment')}
+                  className="
+                    bg-[var(--blush)] text-white 
+                    px-3 py-1.5 sm:px-4 sm:py-2 
+                    rounded-full flex items-center 
+                    gap-1.5 sm:gap-2 
+                    hover:bg-[var(--blush-dark)]
+                    text-xs sm:text-sm font-medium shadow-sm
+                  "
+                >
+                  <Plus size={14} className="sm:size-18" />
+                  Add Appointment
+                </button>
+              </div>
             </div>
+
+            {/* Appointment List */}
             {appointments.length === 0 ? (
               <p className="text-stone-500 text-center py-8">
                 No appointments yet. Add your first appointment!
               </p>
+            ) : filteredAppointments.length === 0 ? (
+              <p className="text-stone-500 text-center py-8">
+                No appointments found for this client.
+              </p>
             ) : (
               <div className="space-y-3">
-                {[...appointments]
-                  .sort(
-                    (a, b) =>
-                      new Date(b.appointment_date) -
-                      new Date(a.appointment_date),
-                  )
-                  .map((appt) => {
-                    const total =
-                      parseFloat(appt.price || 0) + parseFloat(appt.tip || 0);
-                    return (
-                      <div
-                        key={appt.id}
-                        className="border border-stone-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-stone-800">
-                              {appt.client_name}
-                            </h3>
-                            <p className="text-sm text-stone-600">
-                              {appt.service}
+                {sortedFilteredAppointments.map((appt) => {
+                  const total =
+                    parseFloat(appt.price || 0) + parseFloat(appt.tip || 0);
+
+                  return (
+                    <div
+                      key={appt.id}
+                      onClick={() => openAppointmentDetails(appt)}
+                      className="
+                        border border-stone-200 rounded-lg p-4 
+                        hover:shadow-md transition-shadow 
+                        cursor-pointer bg-white
+                      "
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-stone-800">
+                            {appt.client_name}
+                          </h3>
+                          <p className="text-sm text-stone-600">{appt.service}</p>
+                          <p className="text-xs text-stone-500">
+                            📅 {formatDate(appt.appointment_date)}
+                          </p>
+                          {appt.notes && (
+                            <p className="text-sm text-stone-500 mt-1 line-clamp-2">
+                              {appt.notes}
                             </p>
-                            <p className="text-xs text-gray-500">📅 {formatDate(appt.appointment_date)}</p>
-                            {appt.notes && (
-                              <p className="text-sm text-stone-500 mt-1">
-                                {appt.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-[var(--blush)]">
-                              ${total.toFixed(2)}
-                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-[var(--blush)]">
+                            ${total.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-stone-500">
+                            Service: ${appt.price}
+                          </p>
+                          {appt.tip > 0 && (
                             <p className="text-xs text-stone-500">
-                              Service: ${appt.price}
+                              Tip: ${appt.tip}
                             </p>
-                            {appt.tip > 0 && (
-                              <p className="text-xs text-stone-500">
-                                Tip: ${appt.tip}
-                              </p>
-                            )}
-                            <button
-                              onClick={() => togglePaid(appt.id, appt.paid)}
-                              className={`text-xs px-3 py-1 rounded-full mt-1 border ${
+                          )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePaid(appt.id, appt.paid);
+                            }}
+                            className={`
+                              text-xs px-3 py-1 rounded-full mt-1 border
+                              ${
                                 appt.paid
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                                   : 'bg-amber-50 border-amber-200 text-amber-700'
-                              }`}
+                              }
+                            `}
+                          >
+                            {appt.paid ? '✓ Paid' : 'Pending'}
+                          </button>
+
+                          <div className="flex gap-2 mt-2 justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openModal('appointment', appt);
+                              }}
+                              className="text-sky-600 hover:text-sky-800"
                             >
-                              {appt.paid ? '✓ Paid' : 'Pending'}
+                              <Edit2 size={16} />
                             </button>
-                            <div className="flex gap-2 mt-2 justify-end">
-                              <button
-                                onClick={() => openModal('appointment', appt)}
-                                className="text-sky-600 hover:text-sky-800"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteAppointment(appt.id)}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteAppointment(appt.id);
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
+
 
         {/* ---------- Transactions + Monthly Summary ---------- */}
         {currentPage === 'transactions' && (
@@ -1116,20 +1193,34 @@ const NailsByBrooke = () => {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6">
+            {/* Header */}
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-stone-800">
-                {editingId ? 'Edit' : 'Add'}{' '}
-                {modalType === 'client' ? 'Client' : 'Appointment'}
+                {modalType === 'client'
+                  ? editingId
+                    ? 'Edit Client'
+                    : 'Add Client'
+                  : modalType === 'appointment'
+                  ? editingId
+                    ? 'Edit Appointment'
+                    : 'Add Appointment'
+                  : modalType === 'clientDetails'
+                  ? selectedClient?.name || 'Client Details'
+                  : modalType === 'appointmentDetails'
+                  ? 'Appointment Details'
+                  : ''}
               </h3>
               <button
                 onClick={closeModal}
                 className="text-stone-400 hover:text-stone-600"
               >
-                <X size={24} />
+                <X size={22} />
               </button>
             </div>
 
-            {modalType === 'client' ? (
+            {/* Body */}
+            {modalType === 'client' && (
+              /* CLIENT FORM (same as you had before) */
               <div className="space-y-4">
                 <input
                   type="text"
@@ -1138,7 +1229,7 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setClientForm({ ...clientForm, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
                 <input
                   type="tel"
@@ -1147,7 +1238,7 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setClientForm({ ...clientForm, phone: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
                 <input
                   type="email"
@@ -1156,7 +1247,7 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setClientForm({ ...clientForm, email: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
                 <textarea
                   placeholder="Notes"
@@ -1164,25 +1255,28 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setClientForm({ ...clientForm, notes: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                   rows="3"
                 />
                 <button
                   onClick={editingId ? updateClient : addClient}
                   disabled={!clientForm.name || !clientForm.phone}
-                  className="w-full bg-[var(--blush)] text-white py-2 rounded-lg hover:bg-[var(--blush-dark)] disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                  className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
                   {editingId ? 'Update' : 'Add'} Client
                 </button>
               </div>
-            ) : (
+            )}
+
+            {modalType === 'appointment' && (
+              /* APPOINTMENT FORM (same as you had before) */
               <div className="space-y-4">
                 <select
                   value={apptForm.client_id}
                   onChange={(e) =>
                     setApptForm({ ...apptForm, client_id: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 >
                   <option value="">Select Client *</option>
                   {clients.map((c) => (
@@ -1200,7 +1294,7 @@ const NailsByBrooke = () => {
                       appointment_date: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
                 <input
                   type="text"
@@ -1209,7 +1303,7 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setApptForm({ ...apptForm, service: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -1219,7 +1313,7 @@ const NailsByBrooke = () => {
                     onChange={(e) =>
                       setApptForm({ ...apptForm, price: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                     step="0.01"
                   />
                   <input
@@ -1229,20 +1323,22 @@ const NailsByBrooke = () => {
                     onChange={(e) =>
                       setApptForm({ ...apptForm, tip: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                    className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                     step="0.01"
                   />
                 </div>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={apptForm.paid}
                     onChange={(e) =>
                       setApptForm({ ...apptForm, paid: e.target.checked })
                     }
-                    className="w-4 h-4 text-[var(--blush)]"
+                    className="w-4 h-4 accent-[var(--blush)]"
                   />
-                  <span className="text-stone-700">Payment Received</span>
+                  <span className="text-stone-700 text-sm">
+                    Payment Received
+                  </span>
                 </label>
                 <textarea
                   placeholder="Notes"
@@ -1250,7 +1346,7 @@ const NailsByBrooke = () => {
                   onChange={(e) =>
                     setApptForm({ ...apptForm, notes: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)] text-sm"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                   rows="2"
                 />
                 <button
@@ -1261,9 +1357,112 @@ const NailsByBrooke = () => {
                     !apptForm.service ||
                     !apptForm.price
                   }
-                  className="w-full bg-[var(--blush)] text-white py-2 rounded-lg hover:bg-[var(--blush-dark)] disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                  className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
-                  {editingId ? 'Update Appointment' : 'Add Appointment'}
+                  {editingId ? 'Update' : 'Add'} Appointment
+                </button>
+              </div>
+            )}
+
+            {modalType === 'clientDetails' && selectedClient && (
+              <div className="space-y-3">
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Phone:</span>{' '}
+                  {selectedClient.phone}
+                </p>
+                {selectedClient.email && (
+                  <p className="text-sm text-stone-600">
+                    <span className="font-semibold">Email:</span>{' '}
+                    {selectedClient.email}
+                  </p>
+                )}
+                {selectedClient.notes && (
+                  <div className="mt-2">
+                    <p className="text-sm font-semibold text-stone-700 mb-1">
+                      Notes
+                    </p>
+                    <p className="text-sm text-stone-600 whitespace-pre-wrap">
+                      {selectedClient.notes}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setModalType('client');
+                    setEditingId(selectedClient.id);
+                    setClientForm({
+                      name: selectedClient.name || '',
+                      phone: selectedClient.phone || '',
+                      email: selectedClient.email || '',
+                      notes: selectedClient.notes || '',
+                    });
+                  }}
+                  className="mt-4 w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] font-medium"
+                >
+                  Edit Client
+                </button>
+              </div>
+            )}
+
+            {modalType === 'appointmentDetails' && selectedAppointment && (
+              <div className="space-y-3">
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Client:</span>{' '}
+                  {selectedAppointment.client_name}
+                </p>
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Date:</span>{' '}
+                  {formatDate(selectedAppointment.appointment_date)}
+                </p>
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Service:</span>{' '}
+                  {selectedAppointment.service}
+                </p>
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Price:</span>{' '}
+                  ${parseFloat(selectedAppointment.price || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Tip:</span>{' '}
+                  ${parseFloat(selectedAppointment.tip || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-stone-600">
+                  <span className="font-semibold">Status:</span>{' '}
+                  {selectedAppointment.paid ? 'Paid' : 'Pending'}
+                </p>
+
+                {selectedAppointment.notes && (
+                  <div className="mt-2">
+                    <p className="text-sm font-semibold text-stone-700 mb-1">
+                      Notes
+                    </p>
+                    <p className="text-sm text-stone-600 whitespace-pre-wrap">
+                      {selectedAppointment.notes}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setModalType('appointment');
+                    setEditingId(selectedAppointment.id);
+                    setApptForm({
+                      client_id: selectedAppointment.client_id,
+                      appointment_date: selectedAppointment.appointment_date?.slice(
+                        0,
+                        10
+                      ),
+                      service: selectedAppointment.service || '',
+                      price: selectedAppointment.price || '',
+                      tip: selectedAppointment.tip || '',
+                      paid: selectedAppointment.paid || false,
+                      notes: selectedAppointment.notes || '',
+                    });
+                  }}
+                  className="mt-4 w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] font-medium"
+                >
+                  Edit Appointment
                 </button>
               </div>
             )}
