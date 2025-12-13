@@ -421,9 +421,7 @@ const NailsByBrooke = () => {
       <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full border border-stone-200">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-[var(--blush)] mb-2">
-              💅 Nails by Brooke
-            </h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-rose-600 mb-2">💅 Nails by Brooke</h1>
             <p className="text-gray-600">Sign in to manage your business</p>
           </div>
 
@@ -478,7 +476,7 @@ const NailsByBrooke = () => {
     <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100">
       <header className="bg-[var(--blush)] text-white shadow-md">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold tracking-tight">💅 Nails by Brooke</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">💅 Nails by Brooke</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-rose-50/90">
               Welcome, {user && user.name}!
@@ -508,34 +506,34 @@ const NailsByBrooke = () => {
         </div>
       )}
 
-      <nav className="bg-white/80 backdrop-blur shadow-sm border-b border-stone-200">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-center space-x-2 py-3">
+      <nav className="bg-white shadow-md">
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="flex flex-wrap justify-center gap-2 py-3">
             {[
               { id: 'dashboard', icon: Home, label: 'Dashboard' },
               { id: 'clients', icon: Users, label: 'Clients' },
               { id: 'appointments', icon: Calendar, label: 'Appointments' },
               { id: 'transactions', icon: DollarSign, label: 'Transactions' },
-              { id: 'reports', icon: BarChart3, label: 'Reports' }
+              { id: 'reports', icon: BarChart3, label: 'Reports' },
             ].map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
                 onClick={() => setCurrentPage(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full text-sm sm:text-base transition-colors w-full xs:w-auto sm:w-auto ${
                   currentPage === id
-                    ? 'bg-[var(--blush)] border-[var(--blush)] text-white'
-                    : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
                 }`}
               >
-                <Icon size={18} />
-                <span className="hidden sm:inline">{label}</span>
+                <Icon size={16} className="shrink-0" />
+                <span className="sm:inline">{label}</span>
               </button>
             ))}
           </div>
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 py-8 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {/* ---------- Dashboard ---------- */}
         {currentPage === 'dashboard' && (
           <div className="space-y-6">
@@ -1072,8 +1070,8 @@ const NailsByBrooke = () => {
 
       {/* ---------- Modal ---------- */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-stone-200">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-stone-800">
                 {editingId ? 'Edit' : 'Add'}{' '}
