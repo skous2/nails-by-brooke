@@ -30,6 +30,7 @@ const NailsByBrooke = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [appointmentsClientFilter, setAppointmentsClientFilter] = useState('all');
+  const [appointmentsDateFilter, setAppointmentsDateFilter] = useState('all'); // 'all' | 'upcoming' | 'past'
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
@@ -375,10 +376,31 @@ const NailsByBrooke = () => {
     .filter((a) => a.paid)
     .reduce((sum, a) => sum + parseFloat(a.price || 0) + parseFloat(a.tip || 0), 0);
 
+  // Filter + sort appointments for the Appointments page
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const filteredAppointments = appointments.filter((appt) => {
-    if (appointmentsClientFilter === 'all') return true;
-    // compare as strings to avoid number/string mismatches
-    return String(appt.client_id) === String(appointmentsClientFilter);
+    // Client filter
+    const matchesClient =
+      appointmentsClientFilter === 'all' ||
+      String(appt.client_id) === String(appointmentsClientFilter);
+
+    // If no date, just honor client filter
+    if (!appt.appointment_date) return matchesClient;
+
+    const apptDate = new Date(appt.appointment_date);
+    apptDate.setHours(0, 0, 0, 0);
+
+    // Date filter (upcoming vs past)
+    let matchesDate = true;
+    if (appointmentsDateFilter === 'upcoming') {
+      matchesDate = apptDate >= today;
+    } else if (appointmentsDateFilter === 'past') {
+      matchesDate = apptDate < today;
+    }
+
+    return matchesClient && matchesDate;
   });
 
   const sortedFilteredAppointments = [...filteredAppointments].sort(
@@ -774,151 +796,170 @@ const NailsByBrooke = () => {
 
         {/* ---------- Appointments ---------- */}
         {currentPage === 'appointments' && (
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
-            {/* Header + Filter Row */}
-            <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-2xl font-semibold text-stone-800">
-                Appointments
-              </h2>
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
+          {/* Header + Filters Row */}
+          <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-2xl font-semibold text-stone-800">
+              Appointments
+            </h2>
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                {/* Client Filter Dropdown */}
-                <select
-                  value={appointmentsClientFilter}
-                  onChange={(e) => setAppointmentsClientFilter(e.target.value)}
-                  className="
-                    px-3 py-2 border border-stone-300 rounded-lg
-                    text-sm focus:outline-none focus:ring-2
-                    focus:ring-[var(--blush)]
-                  "
-                >
-                  <option value="all">All clients</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              {/* Client Filter */}
+              <select
+                value={appointmentsClientFilter}
+                onChange={(e) => setAppointmentsClientFilter(e.target.value)}
+                className="
+                  px-3 py-2 border border-stone-300 rounded-lg
+                  text-sm focus:outline-none focus:ring-2
+                  focus:ring-[var(--blush)]
+                "
+              >
+                <option value="all">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
 
-                {/* Add Appointment Button */}
-                <button
-                  onClick={() => openModal('appointment')}
-                  className="
-                    bg-[var(--blush)] text-white 
-                    px-3 py-1.5 sm:px-4 sm:py-2 
-                    rounded-full flex items-center 
-                    gap-1.5 sm:gap-2 
-                    hover:bg-[var(--blush-dark)]
-                    text-xs sm:text-sm font-medium shadow-sm
-                  "
-                >
-                  <Plus size={14} className="sm:size-18" />
-                  Add Appointment
-                </button>
-              </div>
+              {/* Date Filter */}
+              <select
+                value={appointmentsDateFilter}
+                onChange={(e) => setAppointmentsDateFilter(e.target.value)}
+                className="
+                  px-3 py-2 border border-stone-300 rounded-lg
+                  text-sm focus:outline-none focus:ring-2
+                  focus:ring-[var(--blush)]
+                "
+              >
+                <option value="all">All dates</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="past">Past</option>
+              </select>
+
+              {/* Add Appointment Button */}
+              <button
+                onClick={() => openModal('appointment')}
+                className="
+                  bg-[var(--blush)] text-white 
+                  px-3 py-1.5 sm:px-4 sm:py-2 
+                  rounded-full flex items-center 
+                  gap-1.5 sm:gap-2 
+                  hover:bg-[var(--blush-dark)]
+                  text-xs sm:text-sm font-medium shadow-sm
+                "
+              >
+                <Plus size={14} className="sm:size-18" />
+                Add Appointment
+              </button>
             </div>
+          </div>
 
-            {/* Appointment List */}
-            {appointments.length === 0 ? (
-              <p className="text-stone-500 text-center py-8">
-                No appointments yet. Add your first appointment!
-              </p>
-            ) : filteredAppointments.length === 0 ? (
-              <p className="text-stone-500 text-center py-8">
-                No appointments found for this client.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {sortedFilteredAppointments.map((appt) => {
-                  const total =
-                    parseFloat(appt.price || 0) + parseFloat(appt.tip || 0);
+          {/* Appointment List */}
+          {appointments.length === 0 ? (
+            <p className="text-stone-500 text-center py-8">
+              No appointments yet. Add your first appointment!
+            </p>
+          ) : filteredAppointments.length === 0 ? (
+            <p className="text-stone-500 text-center py-8">
+              No appointments found for this filter.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {sortedFilteredAppointments.map((appt) => {
+                const total =
+                  parseFloat(appt.price || 0) + parseFloat(appt.tip || 0);
 
-                  return (
-                    <div
-                      key={appt.id}
-                      onClick={() => openAppointmentDetails(appt)}
-                      className="
-                        border border-stone-200 rounded-lg p-4 
-                        hover:shadow-md transition-shadow 
-                        cursor-pointer bg-white
-                      "
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-stone-800">
-                            {appt.client_name}
-                          </h3>
-                          <p className="text-sm text-stone-600">{appt.service}</p>
+                return (
+                  <div
+                    key={appt.id}
+                    onClick={() => openAppointmentDetails(appt)}
+                    className="
+                      border border-stone-200 rounded-lg p-4 
+                      hover:shadow-md transition-shadow 
+                      cursor-pointer bg-white
+                    "
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-stone-800">
+                          {appt.client_name}
+                        </h3>
+                        <p className="text-sm text-stone-600">
+                          {appt.service}
+                        </p>
+                        <p className="text-xs text-stone-500">
+                          📅 {formatDate(appt.appointment_date)}
+                        </p>
+                        {appt.notes && (
+                          <p className="text-sm text-stone-500 mt-1 line-clamp-2">
+                            {appt.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Right side */}
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-[var(--blush)]">
+                          ${total.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-stone-500">
+                          Service: ${appt.price}
+                        </p>
+                        {appt.tip > 0 && (
                           <p className="text-xs text-stone-500">
-                            📅 {formatDate(appt.appointment_date)}
+                            Tip: ${appt.tip}
                           </p>
-                          {appt.notes && (
-                            <p className="text-sm text-stone-500 mt-1 line-clamp-2">
-                              {appt.notes}
-                            </p>
-                          )}
-                        </div>
+                        )}
 
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-[var(--blush)]">
-                            ${total.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-stone-500">
-                            Service: ${appt.price}
-                          </p>
-                          {appt.tip > 0 && (
-                            <p className="text-xs text-stone-500">
-                              Tip: ${appt.tip}
-                            </p>
-                          )}
+                        {/* Paid toggle */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePaid(appt.id, appt.paid);
+                          }}
+                          className={`
+                            text-xs px-3 py-1 rounded-full mt-1 border
+                            ${
+                              appt.paid
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                : 'bg-amber-50 border-amber-200 text-amber-700'
+                            }
+                          `}
+                        >
+                          {appt.paid ? '✓ Paid' : 'Pending'}
+                        </button>
 
+                        {/* Edit / Delete */}
+                        <div className="flex gap-2 mt-2 justify-end">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              togglePaid(appt.id, appt.paid);
+                              openModal('appointment', appt);
                             }}
-                            className={`
-                              text-xs px-3 py-1 rounded-full mt-1 border
-                              ${
-                                appt.paid
-                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                  : 'bg-amber-50 border-amber-200 text-amber-700'
-                              }
-                            `}
+                            className="text-sky-600 hover:text-sky-800"
                           >
-                            {appt.paid ? '✓ Paid' : 'Pending'}
+                            <Edit2 size={16} />
                           </button>
-
-                          <div className="flex gap-2 mt-2 justify-end">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openModal('appointment', appt);
-                              }}
-                              className="text-sky-600 hover:text-sky-800"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteAppointment(appt.id);
-                              }}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteAppointment(appt.id);
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
         {/* ---------- Transactions + Monthly Summary ---------- */}
         {currentPage === 'transactions' && (
