@@ -56,6 +56,15 @@ const NailsByBrooke = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
 
+  // NEW: client filter + detailed report
+  const [reportClientFilter, setReportClientFilter] = useState('all');
+  const [detailedReport, setDetailedReport] = useState({
+    appointments: [],
+    totals: null,
+    client_name: null,
+  });
+  const [detailedLoading, setDetailedLoading] = useState(false);
+
   const formatDate = (dateString) => {
   if (!dateString) return '';
 
@@ -139,8 +148,9 @@ const NailsByBrooke = () => {
   useEffect(() => {
     if (isAuthenticated && token && currentPage === 'reports') {
       loadReport(reportYear);
+      loadDetailedReport(reportYear, reportClientFilter);
     }
-  }, [isAuthenticated, token, currentPage, reportYear]);
+  }, [isAuthenticated, token, currentPage, reportYear, reportClientFilter]);
 
   const loadClients = async () => {
     try {
@@ -181,35 +191,144 @@ const NailsByBrooke = () => {
     }
   };
 
-  const downloadReportPdf = async () => {
+  const loadDetailedReport = async (year, clientId) => {
+    try {
+      setReportError('');
+      setDetailedLoading(true);
+
+      const params = new URLSearchParams();
+      params.set('year', year);
+      if (clientId && clientId !== 'all') {
+        params.set('client_id', clientId);
+      }
+
+      const data = await apiCall(`/reports/detailed?${params.toString()}`);
+
+      setDetailedReport({
+        appointments: data.appointments || [],
+        totals: data.totals || null,
+        client_name: data.client_name || null,
+      });
+    } catch (err) {
+      console.error('Error loading detailed report:', err);
+      setReportError('Failed to load detailed report');
+    } finally {
+      setDetailedLoading(false);
+    }
+  };
+
+
+  const downloadSummaryPdf = async () => {
     try {
       setReportError('');
 
-      const response = await fetch(`${API_BASE_URL}/reports/summary/pdf?year=${reportYear}`, {
-        method: 'GET',
-        headers: {
-          Authorization: token ? `Bearer ${token}` : ''
+      const response = await fetch(
+        `${API_BASE_URL}/reports/summary/pdf?year=${reportYear}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+          },
         }
-      });
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to download PDF');
+        throw new Error('Failed to download summary PDF');
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `nails-by-brooke-income-report-${reportYear}.pdf`;
+      a.download = `nails-by-brooke-income-summary-${reportYear}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error downloading PDF:', err);
-      setReportError('Failed to download PDF');
+      console.error('Error downloading summary PDF:', err);
+      setReportError('Failed to download summary PDF');
     }
   };
+
+  const downloadDetailedPdf = async () => {
+    try {
+      setReportError('');
+
+      const params = new URLSearchParams();
+      params.set('year', reportYear);
+      if (reportClientFilter && reportClientFilter !== 'all') {
+        params.set('client_id', reportClientFilter);
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/reports/detailed/pdf?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download detailed PDF');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nails-by-brooke-detailed-report-${reportYear}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading detailed PDF:', err);
+      setReportError('Failed to download detailed PDF');
+    }
+  };
+
+  const downloadDetailedCsv = async () => {
+    try {
+      setReportError('');
+
+      const params = new URLSearchParams();
+      params.set('year', reportYear);
+      if (reportClientFilter && reportClientFilter !== 'all') {
+        params.set('client_id', reportClientFilter);
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/reports/detailed/csv?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download CSV');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nails-by-brooke-detailed-report-${reportYear}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading CSV:', err);
+      setReportError('Failed to download CSV');
+    }
+  };
+
 
 
   // ---------- Client CRUD ----------
@@ -1096,137 +1215,313 @@ const NailsByBrooke = () => {
 
         {/* Reporting */}
         {currentPage === 'reports' && (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-rose-700">Income Reports</h2>
-          <p className="text-sm text-gray-600">
-            Breakdown of paid appointments by month and year, with tips separated from service income.
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <select
-            value={reportYear}
-            onChange={(e) => setReportYear(parseInt(e.target.value, 10))}
-            className="px-3 py-2 border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400"
-          >
-            {appointmentYears.map(y => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+  <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
+    {/* Top controls */}
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div>
+        <h2 className="text-2xl font-semibold text-stone-800">
+          Reports
+        </h2>
+        <p className="text-sm text-stone-500">
+          View income summaries and detailed appointment history by year and client.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        {/* Year */}
+        <select
+          value={reportYear}
+          onChange={(e) => setReportYear(parseInt(e.target.value, 10))}
+          className="px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+        >
+          {appointmentYears.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+
+        {/* Client filter for detailed reports */}
+        <select
+          value={reportClientFilter}
+          onChange={(e) => setReportClientFilter(e.target.value)}
+          className="px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+        >
+          <option value="all">All clients</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Buttons */}
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={downloadReportPdf}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+            onClick={downloadSummaryPdf}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--blush)] text-white rounded-full text-xs sm:text-sm hover:bg-[var(--blush-dark)]"
           >
-            <BarChart3 size={16} />
-            Download PDF
+            <BarChart3 size={14} />
+            Summary PDF
+          </button>
+          <button
+            onClick={downloadDetailedPdf}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 border border-[var(--blush)] text-[var(--blush)] rounded-full text-xs sm:text-sm hover:bg-[var(--blush-soft)]"
+          >
+            <BarChart3 size={14} />
+            Detailed PDF
+          </button>
+          <button
+            onClick={downloadDetailedCsv}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 border border-stone-300 text-stone-700 rounded-full text-xs sm:text-sm hover:bg-stone-50"
+          >
+            CSV
           </button>
         </div>
       </div>
+    </div>
 
-      {reportError && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {reportError}
+    {reportError && (
+      <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        {reportError}
+      </div>
+    )}
+
+    {/* Summary section */}
+    {reportLoading ? (
+      <p className="text-stone-500 text-sm">Loading summary…</p>
+    ) : (
+      <div className="space-y-8 mb-8">
+        {/* Monthly Summary */}
+        <div>
+          <h3 className="text-lg font-semibold text-stone-800 mb-3">
+            Monthly Summary – {reportData.year}
+          </h3>
+          {reportData.monthly.length === 0 ? (
+            <p className="text-stone-500 text-sm">
+              No paid appointments recorded for this year yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-stone-50 text-left">
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Month
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Service Income
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Tips
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.monthly.map((row) => {
+                    const monthName = new Date(
+                      reportData.year,
+                      row.month - 1,
+                      1
+                    ).toLocaleString('en-US', { month: 'long' });
+                    const service = parseFloat(row.service_total || 0);
+                    const tips = parseFloat(row.tip_total || 0);
+                    const total = parseFloat(row.grand_total || 0);
+                    return (
+                      <tr
+                        key={row.month}
+                        className="border-t border-stone-100"
+                      >
+                        <td className="px-3 py-2">{monthName}</td>
+                        <td className="px-3 py-2">
+                          ${service.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">
+                          ${tips.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 font-semibold">
+                          ${total.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
 
-      {reportLoading ? (
-        <p className="text-gray-500">Loading report…</p>
+        {/* Annual Summary */}
+        <div>
+          <h3 className="text-lg font-semibold text-stone-800 mb-3">
+            Annual Summary (All Years)
+          </h3>
+          {reportData.annual.length === 0 ? (
+            <p className="text-stone-500 text-sm">
+              No paid appointments recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-stone-50 text-left">
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Year
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Service Income
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Tips
+                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.annual.map((row) => {
+                    const service = parseFloat(row.service_total || 0);
+                    const tips = parseFloat(row.tip_total || 0);
+                    const total = parseFloat(row.grand_total || 0);
+                    return (
+                      <tr
+                        key={row.year}
+                        className="border-t border-stone-100"
+                      >
+                        <td className="px-3 py-2">{row.year}</td>
+                        <td className="px-3 py-2">
+                          ${service.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">
+                          ${tips.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 font-semibold">
+                          ${total.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Detailed section */}
+    <div>
+      <h3 className="text-lg font-semibold text-stone-800 mb-3">
+        Detailed Appointments – {reportYear}{' '}
+        {reportClientFilter !== 'all' && detailedReport.client_name
+          ? `· ${detailedReport.client_name}`
+          : '· All clients'}
+      </h3>
+
+      {detailedLoading ? (
+        <p className="text-stone-500 text-sm">Loading detailed report…</p>
+      ) : detailedReport.appointments.length === 0 ? (
+        <p className="text-stone-500 text-sm">
+          No paid appointments for these filters.
+        </p>
       ) : (
-        <div className="space-y-8">
-          {/* Monthly table */}
-          <div>
-            <h3 className="text-xl font-semibold text-rose-700 mb-3">
-              Monthly Summary for {reportData.year}
-            </h3>
-            {reportData.monthly.length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                No paid appointments recorded for this year yet.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-rose-50 text-left">
-                      <th className="px-3 py-2 font-semibold text-gray-700">Month</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Service Income</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Tips</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Total</th>
+        <>
+          <div className="overflow-x-auto mb-4">
+            <table className="min-w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-stone-50 text-left">
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Date
+                  </th>
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Client
+                  </th>
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Service
+                  </th>
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Price
+                  </th>
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Tip
+                  </th>
+                  <th className="px-2 py-2 font-semibold text-stone-700">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailedReport.appointments.map((appt) => {
+                  const price = parseFloat(appt.price || 0);
+                  const tip = parseFloat(appt.tip || 0);
+                  const total = price + tip;
+                  return (
+                    <tr
+                      key={appt.id}
+                      className="border-t border-stone-100 align-top"
+                    >
+                      <td className="px-2 py-1">
+                        {formatDate(appt.appointment_date)}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap">
+                        {appt.client_name}
+                      </td>
+                      <td className="px-2 py-1">
+                        {appt.service}
+                        {appt.notes && (
+                          <div className="text-[11px] text-stone-500 mt-0.5">
+                            {appt.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1">
+                        ${price.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1">
+                        ${tip.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 font-semibold">
+                        ${total.toFixed(2)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.monthly.map((row) => {
-                      const monthName = new Date(reportData.year, row.month - 1, 1).toLocaleString(
-                        'default',
-                        { month: 'long' }
-                      );
-                      const service = parseFloat(row.service_total || 0);
-                      const tips = parseFloat(row.tip_total || 0);
-                      const total = parseFloat(row.grand_total || 0);
-                      return (
-                        <tr key={row.month} className="border-t border-rose-50">
-                          <td className="px-3 py-2">{monthName}</td>
-                          <td className="px-3 py-2">${service.toFixed(2)}</td>
-                          <td className="px-3 py-2">${tips.toFixed(2)}</td>
-                          <td className="px-3 py-2 font-semibold">${total.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Annual table */}
-          <div>
-            <h3 className="text-xl font-semibold text-rose-700 mb-3">
-              Annual Summary (All Years)
-            </h3>
-            {reportData.annual.length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                No paid appointments recorded yet.
+          {detailedReport.totals && (
+            <div className="text-sm text-stone-700">
+              <p>
+                <span className="font-semibold">Appointments:</span>{' '}
+                {detailedReport.totals.count}
               </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-rose-50 text-left">
-                      <th className="px-3 py-2 font-semibold text-gray-700">Year</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Service Income</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Tips</th>
-                      <th className="px-3 py-2 font-semibold text-gray-700">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.annual.map((row) => {
-                      const service = parseFloat(row.service_total || 0);
-                      const tips = parseFloat(row.tip_total || 0);
-                      const total = parseFloat(row.grand_total || 0);
-                      return (
-                        <tr key={row.year} className="border-t border-rose-50">
-                          <td className="px-3 py-2">{row.year}</td>
-                          <td className="px-3 py-2">${service.toFixed(2)}</td>
-                          <td className="px-3 py-2">${tips.toFixed(2)}</td>
-                          <td className="px-3 py-2 font-semibold">${total.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <p className="text-xs text-gray-500">
-            Note: Reports include only appointments marked as <span className="font-semibold">Paid</span>.
-          </p>
-        </div>
+              <p>
+                <span className="font-semibold">Service income:</span>{' '}
+                ${detailedReport.totals.service_total}
+              </p>
+              <p>
+                <span className="font-semibold">Tips:</span>{' '}
+                ${detailedReport.totals.tip_total}
+              </p>
+              <p>
+                <span className="font-semibold">Total:</span>{' '}
+                ${detailedReport.totals.grand_total}
+              </p>
+              <p className="text-[11px] text-stone-500 mt-1">
+                Only appointments marked as <span className="font-semibold">Paid</span> are included.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
-  )}
+  </div>
+)}
 
       </main>
 
