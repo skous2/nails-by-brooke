@@ -509,8 +509,8 @@ router.get('/detailed/pdf', auth, async (req, res) => {
       doc.text(formatDate(row.appointment_date), colX.date, y);
       doc.text(row.client_name, colX.client, y, { width: 120 });
 
-      // Service name may be long → wrap
-      doc.text(row.paymentType || '', colX.paymentType, y, { width: 150 });
+      // Payment Type name may be long → wrap
+      doc.text(row.payment_type ?? 'Not specified', colX.paymentType, y, { width: 150 });
 
       doc.text(`$${fmt(price)}`, colX.price, y, { width: 50, align: 'right' });
       doc.text(`$${fmt(tip)}`, colX.tip, y, { width: 50, align: 'right' });
