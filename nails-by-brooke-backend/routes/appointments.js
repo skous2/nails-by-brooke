@@ -151,7 +151,7 @@ router.post('/',
         });
       }
 
-      const { client_id, appointment_date, service, price, tip, paid, notes } = req.body;
+      const { client_id, appointment_date, payment_type, price, tip, paid, notes } = req.body;
 
       // Verify client belongs to user
       const clientCheck = await db.query(
@@ -165,8 +165,6 @@ router.post('/',
           error: 'Client not found'
         });
       }
-
-      const { payment_type } = req.body;
 
       if (!payment_type || !ALLOWED_PAYMENT_TYPES.includes(payment_type)) {
         return res.status(400).json({
