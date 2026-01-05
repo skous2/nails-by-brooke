@@ -45,11 +45,11 @@ const NailsByBrooke = () => {
   const [apptForm, setApptForm] = useState({
     client_id: '',
     appointment_date: '',
-    service: '',
+    payment_type: '',
     price: '',
     tip: '',
     paid: false,
-    notes: '',
+    notes: ''
   });
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [reportData, setReportData] = useState({ monthly: [], annual: [], year: new Date().getFullYear() });
@@ -376,9 +376,17 @@ const NailsByBrooke = () => {
   // ---------- Appointment CRUD ----------
   const addAppointment = async () => {
     try {
+      const normalizedAppt = {
+        ...apptForm,
+        tip:
+          apptForm.tip === '' || apptForm.tip === null
+            ? 0
+            : Number(apptForm.tip),
+      };
+
       await apiCall('/appointments', {
         method: 'POST',
-        body: JSON.stringify(apptForm),
+        body: JSON.stringify(normalizedAppt),
       });
       await loadAppointments();
       setApptForm({
@@ -398,9 +406,17 @@ const NailsByBrooke = () => {
 
   const updateAppointment = async () => {
     try {
+      const normalizedAppt = {
+        ...apptForm,
+        tip:
+          apptForm.tip === '' || apptForm.tip === null
+            ? 0
+            : Number(apptForm.tip),
+      };
+
       await apiCall(`/appointments/${editingId}`, {
         method: 'PUT',
-        body: JSON.stringify(apptForm),
+        body: JSON.stringify(normalizedAppt),
       });
       await loadAppointments();
       setApptForm({
@@ -458,7 +474,7 @@ const NailsByBrooke = () => {
         setApptForm({
           client_id: item.client_id,
           appointment_date: item.appointment_date,
-          service: item.service,
+          payment_type: item.payment_type,
           price: item.price,
           tip: item.tip,
           paid: item.paid,
@@ -806,7 +822,7 @@ const NailsByBrooke = () => {
                             {appt.client_name}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {appt.service} • {formatDate(appt.appointment_date)}
+                            {appt.payment_type} • {formatDate(appt.appointment_date)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1005,7 +1021,7 @@ const NailsByBrooke = () => {
                           {appt.client_name}
                         </h3>
                         <p className="text-sm text-stone-600">
-                          {appt.service}
+                          {appt.payment_type}
                         </p>
                         <p className="text-xs text-stone-500">
                           📅 {formatDate(appt.appointment_date)}
@@ -1184,7 +1200,7 @@ const NailsByBrooke = () => {
                             {appt.client_name}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {appt.service} • {formatDate(appt.appointment_date)}
+                            {appt.payment_type} • {formatDate(appt.appointment_date)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1471,7 +1487,7 @@ const NailsByBrooke = () => {
                         {appt.client_name}
                       </td>
                       <td className="px-2 py-1">
-                        {appt.service}
+                        {appt.payment_type}
                         {appt.notes && (
                           <div className="text-[11px] text-stone-500 mt-0.5">
                             {appt.notes}
@@ -1632,15 +1648,17 @@ const NailsByBrooke = () => {
                   }
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
-                <input
-                  type="text"
-                  placeholder="Service (e.g., Full Set, Fill) *"
-                  value={apptForm.service}
-                  onChange={(e) =>
-                    setApptForm({ ...apptForm, service: e.target.value })
-                  }
+                <select
+                  value={apptForm.payment_type}
+                  onChange={(e) => setApptForm({ ...apptForm, payment_type: e.target.value })}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
-                />
+                >
+                  <option value="">Select Payment Type *</option>
+                  <option value="Venmo">Venmo</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+                  
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="number"
@@ -1687,12 +1705,8 @@ const NailsByBrooke = () => {
                 />
                 <button
                   onClick={editingId ? updateAppointment : addAppointment}
-                  disabled={
-                    !apptForm.client_id ||
-                    !apptForm.appointment_date ||
-                    !apptForm.service ||
-                    !apptForm.price
-                  }
+                  disabled={!apptForm.client_id || !apptForm.appointment_date || !apptForm.payment_type || !apptForm.price}
+
                   className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
                   {editingId ? 'Update' : 'Add'} Appointment

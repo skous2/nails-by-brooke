@@ -167,7 +167,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
       // Column positions
       const colX = {
         label: 40,
-        service: 210,
+        payment_type: 210,
         tips: 320,
         total: 430,
       };
@@ -175,7 +175,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
       // Header row
       doc.fontSize(10).font('Helvetica-Bold');
       doc.text(isMonth ? 'Month' : 'Year', colX.label, y);
-      doc.text('Service', colX.service, y, { width: 80, align: 'right' });
+      doc.text('Payment Type', colX.paymentType, y, { width: 80, align: 'right' });
       doc.text('Tips', colX.tips, y, { width: 80, align: 'right' });
       doc.text('Total', colX.total, y, { width: 80, align: 'right' });
       y += 16;
@@ -194,7 +194,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
           y += 22;
           doc.fontSize(10);
           doc.text(isMonth ? 'Month' : 'Year', colX.label, y);
-          doc.text('Service', colX.service, y, { width: 80, align: 'right' });
+          doc.text('Payment Type', colX.paymentType, y, { width: 80, align: 'right' });
           doc.text('Tips', colX.tips, y, { width: 80, align: 'right' });
           doc.text('Total', colX.total, y, { width: 80, align: 'right' });
           y += 16;
@@ -303,7 +303,7 @@ router.get('/detailed', auth, async (req, res) => {
       SELECT
         a.id,
         a.appointment_date,
-        a.service,
+        a.payment_type,
         a.price,
         a.tip,
         a.paid,
@@ -379,7 +379,7 @@ router.get('/detailed/pdf', auth, async (req, res) => {
       SELECT
         a.id,
         a.appointment_date,
-        a.service,
+        a.payment_type,
         a.price,
         a.tip,
         a.notes,
@@ -460,7 +460,7 @@ router.get('/detailed/pdf', auth, async (req, res) => {
     const colX = {
       date: 40,
       client: 120,
-      service: 250,
+      paymentType: 250,
       price: 420,
       tip: 480,
       total: 530,
@@ -475,7 +475,7 @@ router.get('/detailed/pdf', auth, async (req, res) => {
         .fontSize(10)
         .text('Date', colX.date, y)
         .text('Client', colX.client, y)
-        .text('Service', colX.service, y)
+        .text('Payment Type', colX.paymentType, y)
         .text('Price', colX.price, y, { width: 50, align: 'right' })
         .text('Tip', colX.tip, y, { width: 50, align: 'right' })
         .text('Total', colX.total, y, { width: 50, align: 'right' });
@@ -510,7 +510,7 @@ router.get('/detailed/pdf', auth, async (req, res) => {
       doc.text(row.client_name, colX.client, y, { width: 120 });
 
       // Service name may be long → wrap
-      doc.text(row.service || '', colX.service, y, { width: 150 });
+      doc.text(row.paymentType || '', colX.paymentType, y, { width: 150 });
 
       doc.text(`$${fmt(price)}`, colX.price, y, { width: 50, align: 'right' });
       doc.text(`$${fmt(tip)}`, colX.tip, y, { width: 50, align: 'right' });
@@ -591,7 +591,7 @@ router.get('/detailed/csv', auth, async (req, res) => {
       `
       SELECT
         a.appointment_date,
-        a.service,
+        a.payment_type,
         a.price,
         a.tip,
         a.paid,
@@ -625,7 +625,7 @@ router.get('/detailed/csv', auth, async (req, res) => {
       [
         'Date',
         'Client',
-        'Service',
+        'Payment Type',
         'Price',
         'Tip',
         'Total',
@@ -641,7 +641,7 @@ router.get('/detailed/csv', auth, async (req, res) => {
       const total = price + tip;
 
       // Escape notes & service so commas don't break CSV
-      const svc = (row.service || '').replace(/"/g, '""');
+      const svc = (row.paymentType || '').replace(/"/g, '""');
       const notes = (row.notes || '').replace(/"/g, '""');
       const clientName = (row.client_name || '').replace(/"/g, '""');
 

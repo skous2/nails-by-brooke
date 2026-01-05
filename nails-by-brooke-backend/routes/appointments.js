@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const db = require('../db');
 const authMiddleware = require('../middleware/auth');
+const ALLOWED_PAYMENT_TYPES = ['Venmo', 'Cash', 'Bank Transfer'];
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.get('/',
           a.client_id, 
           c.name as client_name,
           a.appointment_date, 
-          a.service, 
+          a.payment_type, 
           a.price, 
           a.tip, 
           a.paid, 
@@ -94,7 +95,7 @@ router.get('/:id', async (req, res) => {
         a.client_id, 
         c.name as client_name,
         a.appointment_date, 
-        a.service, 
+        a.payment_type, 
         a.price, 
         a.tip, 
         a.paid, 
@@ -134,7 +135,7 @@ router.post('/',
     body('appointment_date').isDate().withMessage('Valid date is required'),
     body('service').trim().notEmpty().withMessage('Service is required'),
     body('price').isFloat({ min: 0 }).withMessage('Valid price is required'),
-    body('tip').optional().isFloat({ min: 0 }),
+    body('tip').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Tip must be 0 or more'),
     body('paid').optional().isBoolean(),
     body('notes').optional().trim()
   ],
@@ -165,13 +166,24 @@ router.post('/',
         });
       }
 
+      const { payment_type } = req.body;
+
+      if (!payment_type || !ALLOWED_PAYMENT_TYPES.includes(payment_type)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation error',
+          message: 'payment_type must be Venmo, Cash, or Bank Transfer'
+        });
+      }
+
+
       // Create appointment
       const result = await db.query(
         `INSERT INTO appointments 
-        (user_id, client_id, appointment_date, service, price, tip, paid, notes) 
+        (user_id, client_id, appointment_date, payment_type, price, tip, paid, notes) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-        RETURNING id, client_id, appointment_date, service, price, tip, paid, notes, created_at, updated_at`,
-        [req.user.id, client_id, appointment_date, service, price, tip || 0, paid || false, notes || null]
+        RETURNING id, client_id, appointment_date, payment_type, price, tip, paid, notes, created_at, updated_at`,
+        [req.user.id, client_id, appointment_date, payment_type, price, tip || 0, paid || false, notes || null]
       );
 
       res.status(201).json({
@@ -243,10 +255,10 @@ router.put('/:id',
       // Update appointment
       const result = await db.query(
         `UPDATE appointments 
-        SET client_id = $1, appointment_date = $2, service = $3, price = $4, tip = $5, paid = $6, notes = $7
+        SET client_id = $1, appointment_date = $2, payment_type = $3, price = $4, tip = $5, paid = $6, notes = $7
         WHERE id = $8 AND user_id = $9
-        RETURNING id, client_id, appointment_date, service, price, tip, paid, notes, created_at, updated_at`,
-        [client_id, appointment_date, service, price, tip || 0, paid || false, notes || null, id, req.user.id]
+        RETURNING id, client_id, appointment_date, payment_type, price, tip, paid, notes, created_at, updated_at`,
+        [client_id, appointment_date, payment_type, price, tip || 0, paid || false, notes || null, id, req.user.id]
       );
 
       res.json({
