@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const db = require('../db');
 const authMiddleware = require('../middleware/auth');
-const ALLOWED_PAYMENT_TYPES = ['Venmo', 'Cash', 'Bank Transfer'];
+const ALLOWED_PAYMENT_TYPES = ['Venmo', 'Cash', 'Bank Transfer', 'Other'];
 
 const router = express.Router();
 
@@ -151,7 +151,7 @@ router.post('/',
         });
       }
 
-      const { client_id, appointment_date, payment_type, price, tip, paid, notes } = req.body;
+      const { client_id, appointment_date, price, tip, paid, notes } = req.body;
 
       // Verify client belongs to user
       const clientCheck = await db.query(
@@ -166,11 +166,23 @@ router.post('/',
         });
       }
 
-      if (!payment_type || !ALLOWED_PAYMENT_TYPES.includes(payment_type)) {
+      let { payment_type } = req.body;
+
+      // Normalize empty string to null
+      if (payment_type === '') {
+        payment_type = null;
+      }
+
+      // Validate only if provided
+      if (
+        payment_type !== null &&
+        payment_type !== undefined &&
+        !ALLOWED_PAYMENT_TYPES.includes(payment_type)
+      ) {
         return res.status(400).json({
           success: false,
           error: 'Validation error',
-          message: 'payment_type must be Venmo, Cash, or Bank Transfer'
+          message: 'payment_type must be Venmo, Cash, Bank Transfer, or Other',
         });
       }
 

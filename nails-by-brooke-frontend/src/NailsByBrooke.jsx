@@ -1653,7 +1653,7 @@ const NailsByBrooke = () => {
                   onChange={(e) => setApptForm({ ...apptForm, payment_type: e.target.value })}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 >
-                  <option value="">Select Payment Type *</option>
+                  <option value="">Select Payment Type (optional)</option>
                   <option value="Venmo">Venmo</option>
                   <option value="Cash">Cash</option>
                   <option value="Bank Transfer">Bank Transfer</option>
@@ -1705,7 +1705,12 @@ const NailsByBrooke = () => {
                 />
                 <button
                   onClick={editingId ? updateAppointment : addAppointment}
-                  disabled={!apptForm.client_id || !apptForm.appointment_date || !apptForm.payment_type || !apptForm.price}
+                  disabled={
+                    !apptForm.client_id ||
+                    !apptForm.appointment_date ||
+                    !apptForm.price
+                  }
+
 
                   className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
