@@ -378,6 +378,7 @@ const NailsByBrooke = () => {
     try {
       const normalizedAppt = {
         ...apptForm,
+        payment_type: apptForm.payment_type === '' ? null : apptForm.payment_type,
         tip:
           apptForm.tip === '' || apptForm.tip === null
             ? 0
@@ -392,7 +393,7 @@ const NailsByBrooke = () => {
       setApptForm({
         client_id: '',
         appointment_date: '',
-        service: '',
+        payment_type: '',
         price: '',
         tip: '',
         paid: false,
@@ -422,7 +423,7 @@ const NailsByBrooke = () => {
       setApptForm({
         client_id: '',
         appointment_date: '',
-        service: '',
+        payment_type: '',
         price: '',
         tip: '',
         paid: false,
@@ -474,7 +475,7 @@ const NailsByBrooke = () => {
         setApptForm({
           client_id: item.client_id,
           appointment_date: item.appointment_date,
-          payment_type: item.payment_type,
+          payment_type: item.payment_type || '',
           price: item.price,
           tip: item.tip,
           paid: item.paid,
@@ -501,7 +502,7 @@ const NailsByBrooke = () => {
     setShowModal(false);
     setEditingId(null);
     setClientForm({ name: '', phone: '', email: '', notes: '' });
-    setApptForm({ client_id: '', appointment_date: '', service: '', price: '', tip: '', paid: false, notes: '' });
+    setApptForm({ client_id: '', appointment_date: '', payment_type: '', price: '', tip: '', paid: false, notes: '' });
     setSelectedClient(null);
     setSelectedAppointment(null);
   };
@@ -1457,7 +1458,7 @@ const NailsByBrooke = () => {
                     Client
                   </th>
                   <th className="px-2 py-2 font-semibold text-stone-700">
-                    Service
+                    Payment Type
                   </th>
                   <th className="px-2 py-2 font-semibold text-stone-700">
                     Price
@@ -1487,7 +1488,7 @@ const NailsByBrooke = () => {
                         {appt.client_name}
                       </td>
                       <td className="px-2 py-1">
-                        {appt.payment_type}
+                        {appt.payment_type ?? 'Not specified'}
                         {appt.notes && (
                           <div className="text-[11px] text-stone-500 mt-0.5">
                             {appt.notes}
@@ -1772,8 +1773,8 @@ const NailsByBrooke = () => {
                   {formatDate(selectedAppointment.appointment_date)}
                 </p>
                 <p className="text-sm text-stone-600">
-                  <span className="font-semibold">Service:</span>{' '}
-                  {selectedAppointment.service}
+                  <span className="font-semibold">Payment Type:</span>{' '}
+                  {selectedAppointment.payment_type}
                 </p>
                 <p className="text-sm text-stone-600">
                   <span className="font-semibold">Price:</span>{' '}
@@ -1809,7 +1810,7 @@ const NailsByBrooke = () => {
                         0,
                         10
                       ),
-                      service: selectedAppointment.service || '',
+                      payment_type: selectedAppointment.payment_type || '',
                       price: selectedAppointment.price || '',
                       tip: selectedAppointment.tip || '',
                       paid: selectedAppointment.paid || false,
