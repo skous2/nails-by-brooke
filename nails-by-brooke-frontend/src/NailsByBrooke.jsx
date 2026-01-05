@@ -1653,10 +1653,11 @@ const NailsByBrooke = () => {
                   onChange={(e) => setApptForm({ ...apptForm, payment_type: e.target.value })}
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 >
-                  <option value="">Select Payment Type (optional)</option>
+                  <option value="">Select Payment Type</option>
                   <option value="Venmo">Venmo</option>
                   <option value="Cash">Cash</option>
                   <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Other">Other</option>
                 </select>
                   
                 <div className="grid grid-cols-2 gap-3">
