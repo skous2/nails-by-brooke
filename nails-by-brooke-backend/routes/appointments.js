@@ -133,7 +133,7 @@ router.post('/',
   [
     body('client_id').isInt().withMessage('Valid client ID is required'),
     body('appointment_date').isDate().withMessage('Valid date is required'),
-    body('service').trim().notEmpty().withMessage('Service is required'),
+    body('payment_type').trim().notEmpty().withMessage('Payment Type is required'),
     body('price').isFloat({ min: 0 }).withMessage('Valid price is required'),
     body('tip').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Tip must be 0 or more'),
     body('paid').optional().isBoolean(),
@@ -205,7 +205,7 @@ router.put('/:id',
   [
     body('client_id').isInt().withMessage('Valid client ID is required'),
     body('appointment_date').isDate().withMessage('Valid date is required'),
-    body('service').trim().notEmpty().withMessage('Service is required'),
+    body('payment_type').trim().notEmpty().withMessage('Payment Type is required'),
     body('price').isFloat({ min: 0 }).withMessage('Valid price is required'),
     body('tip').optional().isFloat({ min: 0 }),
     body('paid').optional().isBoolean(),
@@ -224,7 +224,7 @@ router.put('/:id',
       }
 
       const { id } = req.params;
-      const { client_id, appointment_date, service, price, tip, paid, notes } = req.body;
+      const { client_id, appointment_date, payment_type, price, tip, paid, notes } = req.body;
 
       // Check if appointment exists and belongs to user
       const checkResult = await db.query(
