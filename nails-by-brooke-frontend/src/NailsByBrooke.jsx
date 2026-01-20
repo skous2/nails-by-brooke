@@ -1595,7 +1595,7 @@ const NailsByBrooke = () => {
                 />
                 <input
                   type="email"
-                  placeholder="Email"
+                  placeholder="Email (optional)"
                   value={clientForm.email}
                   onChange={(e) =>
                     setClientForm({ ...clientForm, email: e.target.value })
