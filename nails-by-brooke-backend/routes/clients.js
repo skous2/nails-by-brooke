@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
 router.post('/',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('phone').trim().notEmpty().withMessage('Phone is required'),
+    body('phone').optional().trim().notEmpty().withMessage('Phone is required'),
     body('email').optional().isEmail().normalizeEmail(),
     body('notes').optional().trim()
   ],
@@ -104,7 +104,7 @@ router.post('/',
 router.put('/:id',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('phone').trim().notEmpty().withMessage('Phone is required'),
+    body('phone').optional().trim().notEmpty().withMessage('Phone is required'),
     body('email').optional().isEmail().normalizeEmail(),
     body('notes').optional().trim()
   ],
