@@ -63,9 +63,9 @@ router.get('/:id', async (req, res) => {
 router.post('/',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('phone').optional().trim().notEmpty().withMessage('Phone is required'),
-    body('email').optional().isEmail().normalizeEmail(),
-    body('notes').optional().trim()
+    body('phone').optional({ checkFalsy: true }).trim(),
+    body('email').optional({ checkFalsy: true }).isEmail().withMessage('Email must be valid').normalizeEmail(),
+    body('notes').optional({ checkFalsy: true }).trim()
   ],
   async (req, res) => {
     try {
@@ -79,11 +79,15 @@ router.post('/',
         });
       }
 
-      const { name, phone, email, notes } = req.body;
+      let { name, phone, email, notes } = req.body;
+
+      phone = phone === '' ? null : phone;
+      email = email === '' ? null : email;
+      notes = notes === '' ? null : notes;
 
       const result = await db.query(
         'INSERT INTO clients (user_id, name, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, phone, email, notes, created_at, updated_at',
-        [req.user.id, name, phone, email || null, notes || null]
+        [req.user.id, name, phone, email, notes]
       );
 
       res.status(201).json({
@@ -104,9 +108,9 @@ router.post('/',
 router.put('/:id',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('phone').optional().trim().notEmpty().withMessage('Phone is required'),
-    body('email').optional().isEmail().normalizeEmail(),
-    body('notes').optional().trim()
+    body('phone').optional({ checkFalsy: true }).trim(),
+    body('email').optional({ checkFalsy: true }).isEmail().withMessage('Email must be valid').normalizeEmail(),
+    body('notes').optional({ checkFalsy: true }).trim()
   ],
   async (req, res) => {
     try {

@@ -1586,7 +1586,7 @@ const NailsByBrooke = () => {
                 />
                 <input
                   type="tel"
-                  placeholder="Phone *"
+                  placeholder="Phone (optional)"
                   value={clientForm.phone}
                   onChange={(e) =>
                     setClientForm({ ...clientForm, phone: e.target.value })
@@ -1613,7 +1613,7 @@ const NailsByBrooke = () => {
                 />
                 <button
                   onClick={editingId ? updateClient : addClient}
-                  disabled={!clientForm.name || !clientForm.phone}
+                  disabled={!clientForm.name.trim()}
                   className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
                   {editingId ? 'Update' : 'Add'} Client
