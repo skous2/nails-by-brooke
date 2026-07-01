@@ -448,9 +448,9 @@ router.get('/detailed/pdf', auth, async (req, res) => {
         ? n.toFixed(2)
         : parseFloat(n || 0).toFixed(2);
 
-    const formatDate = (dateString) => {
-      const [year, month, day] = dateString.slice(0, 10).split('-').map(Number);
-      return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+    const formatDate = (val) => {
+      const d = val instanceof Date ? val : new Date(val);
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
