@@ -448,12 +448,14 @@ router.get('/detailed/pdf', auth, async (req, res) => {
         ? n.toFixed(2)
         : parseFloat(n || 0).toFixed(2);
 
-    const formatDate = (dateString) =>
-      new Date(dateString).toLocaleDateString('en-US', {
+    const formatDate = (dateString) => {
+      const [year, month, day] = dateString.slice(0, 10).split('-').map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       });
+    };
 
     // Title
     doc

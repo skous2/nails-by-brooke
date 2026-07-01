@@ -79,12 +79,9 @@ const NailsByBrooke = () => {
   const [detailedLoading, setDetailedLoading] = useState(false);
 
   const formatDate = (dateString) => {
-  if (!dateString) return '';
-
-  const date = new Date(dateString);
-
-    // Example format: January 15, 2026
-    return date.toLocaleDateString('en-US', {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.slice(0, 10).split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
