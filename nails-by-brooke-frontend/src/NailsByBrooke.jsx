@@ -9,7 +9,8 @@ import {
   Edit2,
   Trash2,
   LogOut,
-  BarChart3
+  BarChart3,
+  Receipt
 } from 'lucide-react';
 import logo from './assets/nailsbybrooke.jpg';
 
@@ -51,8 +52,20 @@ const NailsByBrooke = () => {
     paid: false,
     notes: ''
   });
+  const [expenses, setExpenses] = useState([]);
+  const [expenseForm, setExpenseForm] = useState({
+    expense_date: '',
+    description: '',
+    amount: '',
+    payment_method: '',
+  });
+
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [reportData, setReportData] = useState({ monthly: [], annual: [], year: new Date().getFullYear() });
+  const [reportMonthlyExpenses, setReportMonthlyExpenses] = useState([]);
+  const [reportAnnualExpenses, setReportAnnualExpenses] = useState([]);
+  const [reportExpensesList, setReportExpensesList] = useState([]);
+  const [reportExpensesLoading, setReportExpensesLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
 
@@ -141,14 +154,15 @@ const NailsByBrooke = () => {
     if (isAuthenticated && token) {
       loadClients();
       loadAppointments();
+      loadExpenses();
     }
   }, [isAuthenticated, token]);
 
-  //This might need to be moved.
   useEffect(() => {
     if (isAuthenticated && token && currentPage === 'reports') {
       loadReport(reportYear);
       loadDetailedReport(reportYear, reportClientFilter);
+      loadReportExpenses(reportYear);
     }
   }, [isAuthenticated, token, currentPage, reportYear, reportClientFilter]);
 
@@ -159,6 +173,15 @@ const NailsByBrooke = () => {
     } catch (err) {
       console.error('Error loading clients:', err);
       setError('Failed to load clients');
+    }
+  };
+
+  const loadExpenses = async () => {
+    try {
+      const data = await apiCall('/expenses');
+      setExpenses(data.expenses);
+    } catch (err) {
+      console.error('Error loading expenses:', err);
     }
   };
 
@@ -183,11 +206,25 @@ const NailsByBrooke = () => {
         annual: data.annual || [],
         year: data.year || year
       });
+      setReportMonthlyExpenses(data.monthly_expenses || []);
+      setReportAnnualExpenses(data.annual_expenses || []);
     } catch (err) {
       console.error('Error loading report:', err);
       setReportError('Failed to load report');
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  const loadReportExpenses = async (year) => {
+    try {
+      setReportExpensesLoading(true);
+      const data = await apiCall(`/expenses?year=${year}`);
+      setReportExpensesList(data.expenses || []);
+    } catch (err) {
+      console.error('Error loading report expenses:', err);
+    } finally {
+      setReportExpensesLoading(false);
     }
   };
 
@@ -447,6 +484,53 @@ const NailsByBrooke = () => {
     }
   };
 
+  // ---------- Expense CRUD ----------
+  const addExpense = async () => {
+    try {
+      await apiCall('/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...expenseForm,
+          payment_method: expenseForm.payment_method || null,
+        }),
+      });
+      await loadExpenses();
+      setExpenseForm({ expense_date: '', description: '', amount: '', payment_method: '' });
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const updateExpense = async () => {
+    try {
+      await apiCall(`/expenses/${editingId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...expenseForm,
+          payment_method: expenseForm.payment_method || null,
+        }),
+      });
+      await loadExpenses();
+      setExpenseForm({ expense_date: '', description: '', amount: '', payment_method: '' });
+      setEditingId(null);
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteExpense = async (id) => {
+    if (window.confirm('Delete this expense?')) {
+      try {
+        await apiCall(`/expenses/${id}`, { method: 'DELETE' });
+        await loadExpenses();
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
   const togglePaid = async (id, currentPaid) => {
     try {
       await apiCall(`/appointments/${id}/payment`, {
@@ -470,6 +554,13 @@ const NailsByBrooke = () => {
           phone: item.phone || '',
           email: item.email || '',
           notes: item.notes || '',
+        });
+      } else if (type === 'expense') {
+        setExpenseForm({
+          expense_date: item.expense_date?.slice(0, 10) || '',
+          description: item.description || '',
+          amount: item.amount || '',
+          payment_method: item.payment_method || '',
         });
       } else {
         setApptForm({
@@ -503,6 +594,7 @@ const NailsByBrooke = () => {
     setEditingId(null);
     setClientForm({ name: '', phone: '', email: '', notes: '' });
     setApptForm({ client_id: '', appointment_date: '', payment_type: '', price: '', tip: '', paid: false, notes: '' });
+    setExpenseForm({ expense_date: '', description: '', amount: '', payment_method: '' });
     setSelectedClient(null);
     setSelectedAppointment(null);
   };
@@ -724,6 +816,7 @@ const NailsByBrooke = () => {
               { id: 'clients', icon: Users, label: 'Clients' },
               { id: 'appointments', icon: Calendar, label: 'Appointments' },
               { id: 'transactions', icon: DollarSign, label: 'Transactions' },
+              { id: 'expenses', icon: Receipt, label: 'Expenses' },
               { id: 'reports', icon: BarChart3, label: 'Reports' },
             ].map(({ id, icon: Icon, label }) => (
               <button
@@ -1230,6 +1323,71 @@ const NailsByBrooke = () => {
           </div>
         )}
 
+        {/* ---------- Expenses ---------- */}
+        {currentPage === 'expenses' && (
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-stone-800">Expenses</h2>
+              <button
+                onClick={() => openModal('expense')}
+                className="bg-[var(--blush)] text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 sm:gap-2 hover:bg-[var(--blush-dark)] text-xs sm:text-sm font-medium shadow-sm"
+              >
+                <Plus size={14} /> Add Expense
+              </button>
+            </div>
+
+            {expenses.length === 0 ? (
+              <p className="text-stone-500 text-center py-8">No expenses yet. Add your first expense!</p>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {[...expenses]
+                    .sort((a, b) => new Date(b.expense_date) - new Date(a.expense_date))
+                    .map((expense) => (
+                      <div
+                        key={expense.id}
+                        className="border border-stone-200 rounded-lg p-4 bg-white flex justify-between items-start"
+                      >
+                        <div>
+                          <p className="font-semibold text-stone-800">{expense.description}</p>
+                          <p className="text-sm text-stone-500">📅 {formatDate(expense.expense_date)}</p>
+                          {expense.payment_method && (
+                            <p className="text-sm text-stone-500">{expense.payment_method}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-2">
+                          <p className="text-lg font-bold text-red-500">
+                            -${parseFloat(expense.amount || 0).toFixed(2)}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openModal('expense', expense)}
+                              className="text-sky-600 hover:text-sky-800"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => deleteExpense(expense.id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                <div className="mt-6 pt-4 border-t border-stone-200 text-right">
+                  <p className="text-stone-500 text-sm uppercase tracking-wide">Total Expenses</p>
+                  <p className="text-2xl font-bold text-red-500">
+                    -${expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Reporting */}
         {currentPage === 'reports' && (
   <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
@@ -1323,44 +1481,32 @@ const NailsByBrooke = () => {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-stone-50 text-left">
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Month
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Service Income
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Tips
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Total
-                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Month</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Service Income</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Tips</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Total Income</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Expenses</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Net Profit</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reportData.monthly.map((row) => {
-                    const monthName = new Date(
-                      reportData.year,
-                      row.month - 1,
-                      1
-                    ).toLocaleString('en-US', { month: 'long' });
+                    const monthName = new Date(reportData.year, row.month - 1, 1).toLocaleString('en-US', { month: 'long' });
                     const service = parseFloat(row.service_total || 0);
                     const tips = parseFloat(row.tip_total || 0);
                     const total = parseFloat(row.grand_total || 0);
+                    const expenseRow = reportMonthlyExpenses.find(e => e.month === row.month);
+                    const expenseTotal = parseFloat(expenseRow?.expense_total || 0);
+                    const netProfit = total - expenseTotal;
                     return (
-                      <tr
-                        key={row.month}
-                        className="border-t border-stone-100"
-                      >
+                      <tr key={row.month} className="border-t border-stone-100">
                         <td className="px-3 py-2">{monthName}</td>
-                        <td className="px-3 py-2">
-                          ${service.toFixed(2)}
-                        </td>
-                        <td className="px-3 py-2">
-                          ${tips.toFixed(2)}
-                        </td>
-                        <td className="px-3 py-2 font-semibold">
-                          ${total.toFixed(2)}
+                        <td className="px-3 py-2">${service.toFixed(2)}</td>
+                        <td className="px-3 py-2">${tips.toFixed(2)}</td>
+                        <td className="px-3 py-2">${total.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-red-500">{expenseTotal > 0 ? `-$${expenseTotal.toFixed(2)}` : '—'}</td>
+                        <td className={`px-3 py-2 font-semibold ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ${netProfit.toFixed(2)}
                         </td>
                       </tr>
                     );
@@ -1385,18 +1531,12 @@ const NailsByBrooke = () => {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-stone-50 text-left">
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Year
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Service Income
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Tips
-                    </th>
-                    <th className="px-3 py-2 font-semibold text-stone-700">
-                      Total
-                    </th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Year</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Service Income</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Tips</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Total Income</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Expenses</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Net Profit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1404,20 +1544,18 @@ const NailsByBrooke = () => {
                     const service = parseFloat(row.service_total || 0);
                     const tips = parseFloat(row.tip_total || 0);
                     const total = parseFloat(row.grand_total || 0);
+                    const expenseRow = reportAnnualExpenses.find(e => e.year === row.year);
+                    const expenseTotal = parseFloat(expenseRow?.expense_total || 0);
+                    const netProfit = total - expenseTotal;
                     return (
-                      <tr
-                        key={row.year}
-                        className="border-t border-stone-100"
-                      >
+                      <tr key={row.year} className="border-t border-stone-100">
                         <td className="px-3 py-2">{row.year}</td>
-                        <td className="px-3 py-2">
-                          ${service.toFixed(2)}
-                        </td>
-                        <td className="px-3 py-2">
-                          ${tips.toFixed(2)}
-                        </td>
-                        <td className="px-3 py-2 font-semibold">
-                          ${total.toFixed(2)}
+                        <td className="px-3 py-2">${service.toFixed(2)}</td>
+                        <td className="px-3 py-2">${tips.toFixed(2)}</td>
+                        <td className="px-3 py-2">${total.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-red-500">{expenseTotal > 0 ? `-$${expenseTotal.toFixed(2)}` : '—'}</td>
+                        <td className={`px-3 py-2 font-semibold ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ${netProfit.toFixed(2)}
                         </td>
                       </tr>
                     );
@@ -1429,6 +1567,53 @@ const NailsByBrooke = () => {
         </div>
       </div>
     )}
+
+    {/* Expenses section */}
+    <div className="mb-8">
+      <h3 className="text-lg font-semibold text-stone-800 mb-3">
+        Expenses – {reportYear}
+      </h3>
+      {reportExpensesLoading ? (
+        <p className="text-stone-500 text-sm">Loading expenses…</p>
+      ) : reportExpensesList.length === 0 ? (
+        <p className="text-stone-500 text-sm">No expenses recorded for {reportYear}.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto mb-3">
+            <table className="min-w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-stone-50 text-left">
+                  <th className="px-3 py-2 font-semibold text-stone-700">Date</th>
+                  <th className="px-3 py-2 font-semibold text-stone-700">Description</th>
+                  <th className="px-3 py-2 font-semibold text-stone-700">Payment Method</th>
+                  <th className="px-3 py-2 font-semibold text-stone-700">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportExpensesList.map((exp) => (
+                  <tr key={exp.id} className="border-t border-stone-100">
+                    <td className="px-3 py-2">{formatDate(exp.expense_date)}</td>
+                    <td className="px-3 py-2">{exp.description}</td>
+                    <td className="px-3 py-2">{exp.payment_method || '—'}</td>
+                    <td className="px-3 py-2 text-red-500 font-semibold">
+                      -${parseFloat(exp.amount || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-sm text-stone-700">
+            <p>
+              <span className="font-semibold">Total Expenses:</span>{' '}
+              <span className="text-red-500 font-semibold">
+                -${reportExpensesList.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0).toFixed(2)}
+              </span>
+            </p>
+          </div>
+        </>
+      )}
+    </div>
 
     {/* Detailed section */}
     <div>
@@ -1550,13 +1735,11 @@ const NailsByBrooke = () => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-stone-800">
                 {modalType === 'client'
-                  ? editingId
-                    ? 'Edit Client'
-                    : 'Add Client'
+                  ? editingId ? 'Edit Client' : 'Add Client'
                   : modalType === 'appointment'
-                  ? editingId
-                    ? 'Edit Appointment'
-                    : 'Add Appointment'
+                  ? editingId ? 'Edit Appointment' : 'Add Appointment'
+                  : modalType === 'expense'
+                  ? editingId ? 'Edit Expense' : 'Add Expense'
                   : modalType === 'clientDetails'
                   ? selectedClient?.name || 'Client Details'
                   : modalType === 'appointmentDetails'
@@ -1717,6 +1900,51 @@ const NailsByBrooke = () => {
                   className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
                   {editingId ? 'Update' : 'Add'} Appointment
+                </button>
+              </div>
+            )}
+
+            {modalType === 'expense' && (
+              <div className="space-y-4">
+                <input
+                  type="date"
+                  value={expenseForm.expense_date}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                />
+                <input
+                  type="text"
+                  placeholder="Description *"
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                />
+                <input
+                  type="number"
+                  placeholder="Amount *"
+                  value={expenseForm.amount}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                  step="0.01"
+                />
+                <select
+                  value={expenseForm.payment_method}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                >
+                  <option value="">Payment Method (optional)</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Debit Card">Debit Card</option>
+                  <option value="Venmo">Venmo</option>
+                  <option value="Other">Other</option>
+                </select>
+                <button
+                  onClick={editingId ? updateExpense : addExpense}
+                  disabled={!expenseForm.expense_date || !expenseForm.description.trim() || !expenseForm.amount}
+                  className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
+                >
+                  {editingId ? 'Update' : 'Add'} Expense
                 </button>
               </div>
             )}

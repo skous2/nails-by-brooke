@@ -7,7 +7,8 @@ const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
 const appointmentRoutes = require('./routes/appointments');
 const dashboardRoutes = require('./routes/dashboard');
-const reportRoutes = require('./routes/reports');  
+const reportRoutes = require('./routes/reports');
+const expenseRoutes = require('./routes/expenses');
 
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

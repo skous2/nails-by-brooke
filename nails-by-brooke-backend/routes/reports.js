@@ -57,11 +57,31 @@ router.get('/summary', auth, async (req, res) => {
       [userId]
     );
 
+    const monthlyExpensesResult = await db.query(
+      `SELECT EXTRACT(MONTH FROM expense_date)::int AS month,
+              SUM(amount)::numeric(10,2) AS expense_total
+       FROM expenses
+       WHERE user_id = $1 AND EXTRACT(YEAR FROM expense_date) = $2
+       GROUP BY month ORDER BY month`,
+      [userId, year]
+    );
+
+    const annualExpensesResult = await db.query(
+      `SELECT EXTRACT(YEAR FROM expense_date)::int AS year,
+              SUM(amount)::numeric(10,2) AS expense_total
+       FROM expenses
+       WHERE user_id = $1
+       GROUP BY year ORDER BY year DESC`,
+      [userId]
+    );
+
     res.json({
       success: true,
       year,
       monthly: monthlyResult.rows,
       annual: annualResult.rows,
+      monthly_expenses: monthlyExpensesResult.rows,
+      annual_expenses: annualExpensesResult.rows,
     });
   } catch (err) {
     console.error('Error generating summary report:', err);
