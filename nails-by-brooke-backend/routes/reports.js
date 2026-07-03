@@ -237,7 +237,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
       // Column positions
       const colX = {
         label: 40,
-        payment_type: 210,
+        service: 210,
         tips: 320,
         total: 430,
       };
@@ -245,7 +245,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
       // Header row
       doc.fontSize(10).font('Helvetica-Bold');
       doc.text(isMonth ? 'Month' : 'Year', colX.label, y);
-      doc.text('Payment Type', colX.paymentType, y, { width: 80, align: 'right' });
+      doc.text('Service', colX.service, y, { width: 80, align: 'right' });
       doc.text('Tips', colX.tips, y, { width: 80, align: 'right' });
       doc.text('Total', colX.total, y, { width: 80, align: 'right' });
       y += 16;
@@ -264,7 +264,7 @@ router.get('/summary/pdf', auth, async (req, res) => {
           y += 22;
           doc.fontSize(10);
           doc.text(isMonth ? 'Month' : 'Year', colX.label, y);
-          doc.text('Payment Type', colX.paymentType, y, { width: 80, align: 'right' });
+          doc.text('Service', colX.service, y, { width: 80, align: 'right' });
           doc.text('Tips', colX.tips, y, { width: 80, align: 'right' });
           doc.text('Total', colX.total, y, { width: 80, align: 'right' });
           y += 16;
