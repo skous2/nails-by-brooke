@@ -6,6 +6,16 @@ const router = express.Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
+// Joins each appointment to its payment-method breakdown (appointment_payments),
+// exposing a derived "Cash + Venmo" style summary string as `payment_type`.
+const PAYMENT_JOIN_SQL = `
+  LEFT JOIN LATERAL (
+    SELECT string_agg(DISTINCT ap.payment_type, ' + ' ORDER BY ap.payment_type) AS payment_type
+    FROM appointment_payments ap
+    WHERE ap.appointment_id = a.id
+  ) pmt ON true
+`;
+
 // Helper: get numeric year, default to current
 function getYearFromQuery(queryYear) {
   const now = new Date();
@@ -75,6 +85,27 @@ router.get('/summary', auth, async (req, res) => {
       [userId]
     );
 
+    // Payment-method breakdown for the year (cash vs. card vs. Venmo, etc.)
+    // for tax purposes — split-payment appointments contribute to each
+    // method they were actually paid through.
+    const paymentBreakdownResult = await db.query(
+      `
+      SELECT
+        ap.payment_type,
+        SUM(ap.amount_price)::numeric(10,2) AS price_total,
+        SUM(ap.amount_tip)::numeric(10,2) AS tip_total,
+        SUM(ap.amount_price + ap.amount_tip)::numeric(10,2) AS total
+      FROM appointment_payments ap
+      JOIN appointments a ON a.id = ap.appointment_id
+      WHERE a.user_id = $1
+        AND a.paid = true
+        AND EXTRACT(YEAR FROM a.appointment_date) = $2
+      GROUP BY ap.payment_type
+      ORDER BY ap.payment_type;
+      `,
+      [userId, year]
+    );
+
     res.json({
       success: true,
       year,
@@ -82,6 +113,7 @@ router.get('/summary', auth, async (req, res) => {
       annual: annualResult.rows,
       monthly_expenses: monthlyExpensesResult.rows,
       annual_expenses: annualExpensesResult.rows,
+      payment_breakdown: paymentBreakdownResult.rows,
     });
   } catch (err) {
     console.error('Error generating summary report:', err);
@@ -129,6 +161,24 @@ router.get('/summary/pdf', auth, async (req, res) => {
       ORDER BY year DESC;
       `,
       [userId]
+    );
+
+    const paymentBreakdownResult = await db.query(
+      `
+      SELECT
+        ap.payment_type,
+        SUM(ap.amount_price)::numeric(10,2) AS price_total,
+        SUM(ap.amount_tip)::numeric(10,2) AS tip_total,
+        SUM(ap.amount_price + ap.amount_tip)::numeric(10,2) AS total
+      FROM appointment_payments ap
+      JOIN appointments a ON a.id = ap.appointment_id
+      WHERE a.user_id = $1
+        AND a.paid = true
+        AND EXTRACT(YEAR FROM a.appointment_date) = $2
+      GROUP BY ap.payment_type
+      ORDER BY ap.payment_type;
+      `,
+      [userId, year]
     );
 
     const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
@@ -273,6 +323,45 @@ router.get('/summary/pdf', auth, async (req, res) => {
       startY: doc.y,
     });
 
+    // ===== Payment method breakdown (for tax purposes) =====
+    {
+      const rows = paymentBreakdownResult.rows;
+      let y = doc.y;
+
+      doc.font('Helvetica-Bold').fontSize(14).text('Payment Method Breakdown', 40, y);
+      y += 22;
+
+      if (!rows || rows.length === 0) {
+        doc.font('Helvetica').fontSize(11).text('No paid appointments for this year.', 40, y);
+      } else {
+        const colX = { method: 40, price: 220, tip: 340, total: 460 };
+
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Payment Method', colX.method, y);
+        doc.text('Price', colX.price, y, { width: 80, align: 'right' });
+        doc.text('Tips', colX.tip, y, { width: 80, align: 'right' });
+        doc.text('Total', colX.total, y, { width: 80, align: 'right' });
+        y += 16;
+
+        doc.font('Helvetica').fontSize(10);
+        rows.forEach((row) => {
+          if (y > doc.page.height - 60) {
+            doc.addPage();
+            y = 60;
+          }
+          doc.text(row.payment_type, colX.method, y);
+          doc.text(`$${fmt(row.price_total)}`, colX.price, y, { width: 80, align: 'right' });
+          doc.text(`$${fmt(row.tip_total)}`, colX.tip, y, { width: 80, align: 'right' });
+          doc.text(`$${fmt(row.total)}`, colX.total, y, { width: 80, align: 'right' });
+          y += 14;
+        });
+
+        doc.moveTo(40, y + 2).lineTo(550, y + 2).strokeColor('#DDDDDD').stroke();
+      }
+
+      doc.y = y + 12;
+    }
+
     // Footnote
     doc
       .font('Helvetica')
@@ -323,7 +412,7 @@ router.get('/detailed', auth, async (req, res) => {
       SELECT
         a.id,
         a.appointment_date,
-        a.payment_type,
+        pmt.payment_type,
         a.price,
         a.tip,
         a.paid,
@@ -332,6 +421,7 @@ router.get('/detailed', auth, async (req, res) => {
         c.name AS client_name
       FROM appointments a
       JOIN clients c ON c.id = a.client_id
+      ${PAYMENT_JOIN_SQL}
       WHERE a.user_id = $1
         AND a.paid = true
         AND EXTRACT(YEAR FROM a.appointment_date) = $2
@@ -399,13 +489,14 @@ router.get('/detailed/pdf', auth, async (req, res) => {
       SELECT
         a.id,
         a.appointment_date,
-        a.payment_type,
+        pmt.payment_type,
         a.price,
         a.tip,
         a.notes,
         c.name AS client_name
       FROM appointments a
       JOIN clients c ON c.id = a.client_id
+      ${PAYMENT_JOIN_SQL}
       WHERE a.user_id = $1
         AND a.paid = true
         AND EXTRACT(YEAR FROM a.appointment_date) = $2
@@ -613,7 +704,7 @@ router.get('/detailed/csv', auth, async (req, res) => {
       `
       SELECT
         a.appointment_date,
-        a.payment_type,
+        pmt.payment_type,
         a.price,
         a.tip,
         a.paid,
@@ -621,6 +712,7 @@ router.get('/detailed/csv', auth, async (req, res) => {
         c.name AS client_name
       FROM appointments a
       JOIN clients c ON c.id = a.client_id
+      ${PAYMENT_JOIN_SQL}
       WHERE a.user_id = $1
         AND a.paid = true
         AND EXTRACT(YEAR FROM a.appointment_date) = $2
@@ -662,8 +754,8 @@ router.get('/detailed/csv', auth, async (req, res) => {
       const tip = parseFloat(row.tip || 0);
       const total = price + tip;
 
-      // Escape notes & service so commas don't break CSV
-      const svc = (row.paymentType || '').replace(/"/g, '""');
+      // Escape notes & payment type so commas don't break CSV
+      const svc = (row.payment_type || '').replace(/"/g, '""');
       const notes = (row.notes || '').replace(/"/g, '""');
       const clientName = (row.client_name || '').replace(/"/g, '""');
 

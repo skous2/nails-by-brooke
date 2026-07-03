@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   DollarSign,
@@ -17,6 +17,98 @@ import logo from './assets/nailsbybrooke.jpg';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 console.log('API_BASE_URL in frontend:', API_BASE_URL);
+
+// Type-to-search client picker. Replaces plain <select> dropdowns so users
+// filter by typing instead of scrolling a long client list.
+const ClientSearchSelect = ({
+  clients,
+  value,
+  onChange,
+  placeholder = 'Search clients...',
+  allOptionLabel = null, // pass a label (e.g. "All clients") to include a non-client option
+  className = '',
+}) => {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedClient = clients.find((c) => String(c.id) === String(value));
+  const displayValue = isOpen
+    ? query
+    : value === 'all'
+    ? allOptionLabel || ''
+    : selectedClient
+    ? selectedClient.name
+    : '';
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredClients = clients.filter((c) =>
+    c.name.toLowerCase().includes(query.toLowerCase())
+  );
+  const showAllOption =
+    allOptionLabel !== null &&
+    allOptionLabel.toLowerCase().includes(query.toLowerCase());
+
+  const selectOption = (optionValue) => {
+    onChange(optionValue);
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div className={`relative ${className}`} ref={containerRef}>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => {
+          setQuery('');
+          setIsOpen(true);
+        }}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+      />
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto bg-white border border-stone-200 rounded-lg shadow-lg">
+          {showAllOption && (
+            <div
+              onMouseDown={() => selectOption('all')}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-stone-100"
+            >
+              {allOptionLabel}
+            </div>
+          )}
+          {filteredClients.length === 0 && !showAllOption ? (
+            <div className="px-3 py-2 text-sm text-stone-400">No clients found</div>
+          ) : (
+            filteredClients.map((c) => (
+              <div
+                key={c.id}
+                onMouseDown={() => selectOption(String(c.id))}
+                className="px-3 py-2 text-sm cursor-pointer hover:bg-stone-100"
+              >
+                {c.name}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const NailsByBrooke = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,11 +138,11 @@ const NailsByBrooke = () => {
   const [apptForm, setApptForm] = useState({
     client_id: '',
     appointment_date: '',
-    payment_type: '',
     price: '',
     tip: '',
     paid: false,
-    notes: ''
+    notes: '',
+    payments: [], // [{ payment_type, amount_price, amount_tip }]
   });
   const [expenses, setExpenses] = useState([]);
   const [expenseForm, setExpenseForm] = useState({
@@ -61,7 +153,7 @@ const NailsByBrooke = () => {
   });
 
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
-  const [reportData, setReportData] = useState({ monthly: [], annual: [], year: new Date().getFullYear() });
+  const [reportData, setReportData] = useState({ monthly: [], annual: [], payment_breakdown: [], year: new Date().getFullYear() });
   const [reportMonthlyExpenses, setReportMonthlyExpenses] = useState([]);
   const [reportAnnualExpenses, setReportAnnualExpenses] = useState([]);
   const [reportExpensesList, setReportExpensesList] = useState([]);
@@ -201,6 +293,7 @@ const NailsByBrooke = () => {
       setReportData({
         monthly: data.monthly || [],
         annual: data.annual || [],
+        payment_breakdown: data.payment_breakdown || [],
         year: data.year || year
       });
       setReportMonthlyExpenses(data.monthly_expenses || []);
@@ -408,31 +501,39 @@ const NailsByBrooke = () => {
   };
 
   // ---------- Appointment CRUD ----------
+  const normalizeApptForSubmit = () => ({
+    ...apptForm,
+    tip:
+      apptForm.tip === '' || apptForm.tip === null
+        ? 0
+        : Number(apptForm.tip),
+    payments: apptForm.paid
+      ? apptForm.payments.map((p) => ({
+          payment_type: p.payment_type,
+          amount_price: Number(p.amount_price) || 0,
+          amount_tip: Number(p.amount_tip) || 0,
+        }))
+      : [],
+  });
+
+  const emptyApptForm = {
+    client_id: '',
+    appointment_date: '',
+    price: '',
+    tip: '',
+    paid: false,
+    notes: '',
+    payments: [],
+  };
+
   const addAppointment = async () => {
     try {
-      const normalizedAppt = {
-        ...apptForm,
-        payment_type: apptForm.payment_type === '' ? null : apptForm.payment_type,
-        tip:
-          apptForm.tip === '' || apptForm.tip === null
-            ? 0
-            : Number(apptForm.tip),
-      };
-
       await apiCall('/appointments', {
         method: 'POST',
-        body: JSON.stringify(normalizedAppt),
+        body: JSON.stringify(normalizeApptForSubmit()),
       });
       await loadAppointments();
-      setApptForm({
-        client_id: '',
-        appointment_date: '',
-        payment_type: '',
-        price: '',
-        tip: '',
-        paid: false,
-        notes: '',
-      });
+      setApptForm(emptyApptForm);
       setShowModal(false);
     } catch (err) {
       setError(err.message);
@@ -441,28 +542,12 @@ const NailsByBrooke = () => {
 
   const updateAppointment = async () => {
     try {
-      const normalizedAppt = {
-        ...apptForm,
-        tip:
-          apptForm.tip === '' || apptForm.tip === null
-            ? 0
-            : Number(apptForm.tip),
-      };
-
       await apiCall(`/appointments/${editingId}`, {
         method: 'PUT',
-        body: JSON.stringify(normalizedAppt),
+        body: JSON.stringify(normalizeApptForSubmit()),
       });
       await loadAppointments();
-      setApptForm({
-        client_id: '',
-        appointment_date: '',
-        payment_type: '',
-        price: '',
-        tip: '',
-        paid: false,
-        notes: '',
-      });
+      setApptForm(emptyApptForm);
       setEditingId(null);
       setShowModal(false);
     } catch (err) {
@@ -540,6 +625,41 @@ const NailsByBrooke = () => {
     }
   };
 
+  // ---------- Payment breakdown rows (Add/Edit Appointment form) ----------
+  const setPaid = (paid) => {
+    setApptForm((prev) => ({
+      ...prev,
+      paid,
+      // Seed a single row pre-filled with the full total so the common
+      // (single payment method) case is just "pick a type" and save.
+      payments:
+        paid && prev.payments.length === 0
+          ? [{ payment_type: '', amount_price: prev.price || 0, amount_tip: prev.tip || 0 }]
+          : prev.payments,
+    }));
+  };
+
+  const addPaymentRow = () => {
+    setApptForm((prev) => ({
+      ...prev,
+      payments: [...prev.payments, { payment_type: '', amount_price: '', amount_tip: '' }],
+    }));
+  };
+
+  const updatePaymentRow = (index, field, value) => {
+    setApptForm((prev) => ({
+      ...prev,
+      payments: prev.payments.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+    }));
+  };
+
+  const removePaymentRow = (index) => {
+    setApptForm((prev) => ({
+      ...prev,
+      payments: prev.payments.filter((_, i) => i !== index),
+    }));
+  };
+
   // ---------- Modal helpers ----------
   const openModal = (type, item = null) => {
     setModalType(type);
@@ -563,11 +683,11 @@ const NailsByBrooke = () => {
         setApptForm({
           client_id: item.client_id,
           appointment_date: item.appointment_date,
-          payment_type: item.payment_type || '',
           price: item.price,
           tip: item.tip,
           paid: item.paid,
           notes: item.notes || '',
+          payments: item.payments || [],
         });
       }
     }
@@ -590,7 +710,7 @@ const NailsByBrooke = () => {
     setShowModal(false);
     setEditingId(null);
     setClientForm({ name: '', phone: '', email: '', notes: '' });
-    setApptForm({ client_id: '', appointment_date: '', payment_type: '', price: '', tip: '', paid: false, notes: '' });
+    setApptForm(emptyApptForm);
     setExpenseForm({ expense_date: '', description: '', amount: '', payment_method: '' });
     setSelectedClient(null);
     setSelectedAppointment(null);
@@ -600,6 +720,25 @@ const NailsByBrooke = () => {
   const totalEarnings = appointments
     .filter((a) => a.paid)
     .reduce((sum, a) => sum + parseFloat(a.price || 0) + parseFloat(a.tip || 0), 0);
+
+  // Payment breakdown validity for the Add/Edit Appointment form: once
+  // marked Paid, the payment rows must fully allocate the price + tip.
+  const apptFormAllocatedPrice = apptForm.payments.reduce(
+    (sum, p) => sum + (parseFloat(p.amount_price) || 0),
+    0
+  );
+  const apptFormAllocatedTip = apptForm.payments.reduce(
+    (sum, p) => sum + (parseFloat(p.amount_tip) || 0),
+    0
+  );
+  const apptFormRemaining =
+    (parseFloat(apptForm.price) || 0) + (parseFloat(apptForm.tip) || 0) -
+    (apptFormAllocatedPrice + apptFormAllocatedTip);
+  const apptFormPaymentsValid =
+    !apptForm.paid ||
+    (apptForm.payments.length > 0 &&
+      apptForm.payments.every((p) => p.payment_type) &&
+      Math.abs(apptFormRemaining) < 0.01);
 
   // Filter + sort appointments for the Appointments page
   const today = new Date();
@@ -1031,22 +1170,14 @@ const NailsByBrooke = () => {
 
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
               {/* Client Filter */}
-              <select
+              <ClientSearchSelect
+                clients={clients}
                 value={appointmentsClientFilter}
-                onChange={(e) => setAppointmentsClientFilter(e.target.value)}
-                className="
-                  px-3 py-2 border border-stone-300 rounded-lg
-                  text-sm focus:outline-none focus:ring-2
-                  focus:ring-[var(--blush)]
-                "
-              >
-                <option value="all">All clients</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setAppointmentsClientFilter}
+                placeholder="All clients"
+                allOptionLabel="All clients"
+                className="sm:w-48"
+              />
 
               {/* Date Filter */}
               <select
@@ -1414,18 +1545,14 @@ const NailsByBrooke = () => {
         </select>
 
         {/* Client filter for detailed reports */}
-        <select
+        <ClientSearchSelect
+          clients={clients}
           value={reportClientFilter}
-          onChange={(e) => setReportClientFilter(e.target.value)}
-          className="px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
-        >
-          <option value="all">All clients</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          onChange={setReportClientFilter}
+          placeholder="All clients"
+          allOptionLabel="All clients"
+          className="sm:w-48"
+        />
 
         {/* Buttons */}
         <div className="flex flex-wrap gap-2">
@@ -1557,6 +1684,41 @@ const NailsByBrooke = () => {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Method Breakdown (for tax purposes) */}
+        <div>
+          <h3 className="text-lg font-semibold text-stone-800 mb-3">
+            Payment Method Breakdown – {reportData.year}
+          </h3>
+          {reportData.payment_breakdown.length === 0 ? (
+            <p className="text-stone-500 text-sm">
+              No paid appointments recorded for this year yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-stone-50 text-left">
+                    <th className="px-3 py-2 font-semibold text-stone-700">Payment Method</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Service Income</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Tips</th>
+                    <th className="px-3 py-2 font-semibold text-stone-700">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.payment_breakdown.map((row) => (
+                    <tr key={row.payment_type} className="border-t border-stone-100">
+                      <td className="px-3 py-2">{row.payment_type}</td>
+                      <td className="px-3 py-2">${parseFloat(row.price_total || 0).toFixed(2)}</td>
+                      <td className="px-3 py-2">${parseFloat(row.tip_total || 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 font-semibold">${parseFloat(row.total || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1804,20 +1966,14 @@ const NailsByBrooke = () => {
             {modalType === 'appointment' && (
               /* APPOINTMENT FORM (same as you had before) */
               <div className="space-y-4">
-                <select
+                <ClientSearchSelect
+                  clients={clients}
                   value={apptForm.client_id}
-                  onChange={(e) =>
-                    setApptForm({ ...apptForm, client_id: e.target.value })
+                  onChange={(clientId) =>
+                    setApptForm({ ...apptForm, client_id: clientId })
                   }
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
-                >
-                  <option value="">Select Client *</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Client *"
+                />
                 <input
                   type="date"
                   value={apptForm.appointment_date}
@@ -1829,18 +1985,6 @@ const NailsByBrooke = () => {
                   }
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                 />
-                <select
-                  value={apptForm.payment_type}
-                  onChange={(e) => setApptForm({ ...apptForm, payment_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
-                >
-                  <option value="">Select Payment Type</option>
-                  <option value="Venmo">Venmo</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Other">Other</option>
-                </select>
-                  
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="number"
@@ -1867,15 +2011,95 @@ const NailsByBrooke = () => {
                   <input
                     type="checkbox"
                     checked={apptForm.paid}
-                    onChange={(e) =>
-                      setApptForm({ ...apptForm, paid: e.target.checked })
-                    }
+                    onChange={(e) => setPaid(e.target.checked)}
                     className="w-4 h-4 accent-[var(--blush)]"
                   />
                   <span className="text-stone-700 text-sm">
                     Payment Received
                   </span>
                 </label>
+
+                {apptForm.paid && (
+                  <div className="space-y-2 border border-stone-200 rounded-lg p-3 bg-stone-50/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-stone-700">
+                        Payment Breakdown
+                      </span>
+                      <span
+                        className={`text-xs font-medium ${
+                          Math.abs(apptFormRemaining) < 0.01
+                            ? 'text-emerald-600'
+                            : 'text-amber-600'
+                        }`}
+                      >
+                        {Math.abs(apptFormRemaining) < 0.01
+                          ? 'Fully allocated'
+                          : `$${apptFormRemaining.toFixed(2)} remaining`}
+                      </span>
+                    </div>
+
+                    {apptForm.payments.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white border border-stone-200 rounded-lg p-2 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={p.payment_type}
+                            onChange={(e) =>
+                              updatePaymentRow(idx, 'payment_type', e.target.value)
+                            }
+                            className="flex-1 px-2 py-1.5 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                          >
+                            <option value="">Payment Type *</option>
+                            <option value="Venmo">Venmo</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => removePaymentRow(idx)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            placeholder="Toward price"
+                            value={p.amount_price}
+                            onChange={(e) =>
+                              updatePaymentRow(idx, 'amount_price', e.target.value)
+                            }
+                            className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                            step="0.01"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Toward tip"
+                            value={p.amount_tip}
+                            onChange={(e) =>
+                              updatePaymentRow(idx, 'amount_tip', e.target.value)
+                            }
+                            className="w-full px-2 py-1.5 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addPaymentRow}
+                      className="text-xs font-medium text-[var(--blush)] hover:underline"
+                    >
+                      + Add payment method
+                    </button>
+                  </div>
+                )}
+
                 <textarea
                   placeholder="Notes"
                   value={apptForm.notes}
@@ -1890,10 +2114,9 @@ const NailsByBrooke = () => {
                   disabled={
                     !apptForm.client_id ||
                     !apptForm.appointment_date ||
-                    !apptForm.price
+                    !apptForm.price ||
+                    !apptFormPaymentsValid
                   }
-
-
                   className="w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] disabled:bg-stone-300 disabled:cursor-not-allowed font-medium"
                 >
                   {editingId ? 'Update' : 'Add'} Appointment
@@ -1997,10 +2220,24 @@ const NailsByBrooke = () => {
                   <span className="font-semibold">Date:</span>{' '}
                   {formatDate(selectedAppointment.appointment_date)}
                 </p>
-                <p className="text-sm text-stone-600">
-                  <span className="font-semibold">Payment Type:</span>{' '}
-                  {selectedAppointment.payment_type}
-                </p>
+                <div className="text-sm text-stone-600">
+                  <span className="font-semibold">
+                    Payment{selectedAppointment.payments?.length > 1 ? 's' : ''}:
+                  </span>{' '}
+                  {selectedAppointment.payments && selectedAppointment.payments.length > 0 ? (
+                    <ul className="mt-1 pl-4 list-disc space-y-0.5">
+                      {selectedAppointment.payments.map((p, i) => (
+                        <li key={i}>
+                          {p.payment_type}: ${parseFloat(p.amount_price || 0).toFixed(2)} price
+                          {parseFloat(p.amount_tip || 0) > 0 &&
+                            ` + $${parseFloat(p.amount_tip).toFixed(2)} tip`}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    'Not recorded'
+                  )}
+                </div>
                 <p className="text-sm text-stone-600">
                   <span className="font-semibold">Price:</span>{' '}
                   ${parseFloat(selectedAppointment.price || 0).toFixed(2)}
@@ -2035,11 +2272,11 @@ const NailsByBrooke = () => {
                         0,
                         10
                       ),
-                      payment_type: selectedAppointment.payment_type || '',
                       price: selectedAppointment.price || '',
                       tip: selectedAppointment.tip || '',
                       paid: selectedAppointment.paid || false,
                       notes: selectedAppointment.notes || '',
+                      payments: selectedAppointment.payments || [],
                     });
                   }}
                   className="mt-4 w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] font-medium"
