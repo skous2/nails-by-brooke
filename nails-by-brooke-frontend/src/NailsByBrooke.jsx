@@ -200,7 +200,8 @@ const NailsByBrooke = () => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'API request failed');
+      const detail = data.message || (data.details && data.details.join(', '));
+      throw new Error(detail ? `${data.error}: ${detail}` : data.error || 'API request failed');
     }
 
     return data;
@@ -622,6 +623,18 @@ const NailsByBrooke = () => {
       await loadAppointments();
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  // Marking an appointment paid needs a payment-method breakdown, so route
+  // that case through the edit form instead of the no-data quick toggle.
+  // Marking it pending again doesn't need any data, so that stays instant.
+  const handlePaidToggleClick = (appt) => {
+    if (appt.paid) {
+      togglePaid(appt.id, appt.paid);
+    } else {
+      openModal('appointment', appt);
+      setPaid(true);
     }
   };
 
@@ -1273,7 +1286,7 @@ const NailsByBrooke = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            togglePaid(appt.id, appt.paid);
+                            handlePaidToggleClick(appt);
                           }}
                           className={`
                             text-xs px-3 py-1 rounded-full mt-1 border
