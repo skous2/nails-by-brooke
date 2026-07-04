@@ -134,7 +134,9 @@ const NailsByBrooke = () => {
     phone: '',
     email: '',
     notes: '',
+    is_one_time_client: false,
   });
+  const [clientsOneTimeFilter, setClientsOneTimeFilter] = useState('all'); // 'all' | 'one_time' | 'regular'
   const [apptForm, setApptForm] = useState({
     client_id: '',
     appointment_date: '',
@@ -167,6 +169,7 @@ const NailsByBrooke = () => {
     appointments: [],
     totals: null,
     client_name: null,
+    payment_breakdown: [],
   });
   const [detailedLoading, setDetailedLoading] = useState(false);
 
@@ -336,6 +339,7 @@ const NailsByBrooke = () => {
         appointments: data.appointments || [],
         totals: data.totals || null,
         client_name: data.client_name || null,
+        payment_breakdown: data.payment_breakdown || [],
       });
     } catch (err) {
       console.error('Error loading detailed report:', err);
@@ -467,7 +471,7 @@ const NailsByBrooke = () => {
         body: JSON.stringify(clientForm),
       });
       await loadClients();
-      setClientForm({ name: '', phone: '', email: '', notes: '' });
+      setClientForm({ name: '', phone: '', email: '', notes: '', is_one_time_client: false });
       setShowModal(false);
     } catch (err) {
       setError(err.message);
@@ -481,7 +485,7 @@ const NailsByBrooke = () => {
         body: JSON.stringify(clientForm),
       });
       await loadClients();
-      setClientForm({ name: '', phone: '', email: '', notes: '' });
+      setClientForm({ name: '', phone: '', email: '', notes: '', is_one_time_client: false });
       setEditingId(null);
       setShowModal(false);
     } catch (err) {
@@ -684,6 +688,7 @@ const NailsByBrooke = () => {
           phone: item.phone || '',
           email: item.email || '',
           notes: item.notes || '',
+          is_one_time_client: !!item.is_one_time_client,
         });
       } else if (type === 'expense') {
         setExpenseForm({
@@ -722,7 +727,7 @@ const NailsByBrooke = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditingId(null);
-    setClientForm({ name: '', phone: '', email: '', notes: '' });
+    setClientForm({ name: '', phone: '', email: '', notes: '', is_one_time_client: false });
     setApptForm(emptyApptForm);
     setExpenseForm({ expense_date: '', description: '', amount: '', payment_method: '' });
     setSelectedClient(null);
@@ -730,6 +735,12 @@ const NailsByBrooke = () => {
   };
 
   // ---------- Derived totals ----------
+  const filteredClients = clients.filter((client) => {
+    if (clientsOneTimeFilter === 'one_time') return !!client.is_one_time_client;
+    if (clientsOneTimeFilter === 'regular') return !client.is_one_time_client;
+    return true;
+  });
+
   const totalEarnings = appointments
     .filter((a) => a.paid)
     .reduce((sum, a) => sum + parseFloat(a.price || 0) + parseFloat(a.tip || 0), 0);
@@ -1099,29 +1110,48 @@ const NailsByBrooke = () => {
         {/* ---------- Clients ---------- */}
         {currentPage === 'clients' && (
           <div className="bg-white rounded-xl shadow-sm p-6 border border-stone-200">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-semibold text-stone-800">Clients</h2>
-              <button
-                onClick={() => openModal('client')}
-                className="
-                  bg-[var(--blush)] text-white 
-                  px-3 py-1.5        /* smaller mobile padding */
-                  sm:px-4 sm:py-2    /* normal padding on tablet/desktop */
-                  rounded-full flex items-center gap-1.5 sm:gap-2 
-                  hover:bg-[var(--blush-dark)] 
-                  text-xs sm:text-sm font-medium shadow-sm
-                "
-              >
-                <Plus size={14} className="sm:size-18" /> Add Client
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <select
+                  value={clientsOneTimeFilter}
+                  onChange={(e) => setClientsOneTimeFilter(e.target.value)}
+                  className="
+                    px-3 py-2 border border-stone-300 rounded-lg
+                    text-sm focus:outline-none focus:ring-2
+                    focus:ring-[var(--blush)]
+                  "
+                >
+                  <option value="all">All clients</option>
+                  <option value="one_time">One-time clients</option>
+                  <option value="regular">Regular clients</option>
+                </select>
+                <button
+                  onClick={() => openModal('client')}
+                  className="
+                    bg-[var(--blush)] text-white
+                    px-3 py-1.5        /* smaller mobile padding */
+                    sm:px-4 sm:py-2    /* normal padding on tablet/desktop */
+                    rounded-full flex items-center gap-1.5 sm:gap-2
+                    hover:bg-[var(--blush-dark)]
+                    text-xs sm:text-sm font-medium shadow-sm
+                  "
+                >
+                  <Plus size={14} className="sm:size-18" /> Add Client
+                </button>
+              </div>
             </div>
             {clients.length === 0 ? (
               <p className="text-stone-500 text-center py-8">
                 No clients yet. Add your first client!
               </p>
+            ) : filteredClients.length === 0 ? (
+              <p className="text-stone-500 text-center py-8">
+                No clients match this filter.
+              </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {clients.map((client) => (
+                {filteredClients.map((client) => (
                   <div
                     key={client.id}
                     onClick={() => openClientDetails(client)}
@@ -1156,6 +1186,11 @@ const NailsByBrooke = () => {
                         </button>
                       </div>
                     </div>
+                    {client.is_one_time_client && (
+                      <span className="inline-block mb-2 text-xs px-2 py-1 rounded-full border bg-amber-50 border-amber-200 text-amber-700">
+                        One-time client
+                      </span>
+                    )}
                     <p className="text-sm text-stone-600">📞 {client.phone}</p>
                     {client.email && (
                       <p className="text-sm text-stone-600">✉️ {client.email}</p>
@@ -1891,6 +1926,41 @@ const NailsByBrooke = () => {
               </p>
             </div>
           )}
+
+          {/* Payment Method Breakdown, scoped to the selected client/year */}
+          <div className="mt-6">
+            <h4 className="text-sm font-semibold text-stone-800 mb-2">
+              Payment Method Breakdown
+            </h4>
+            {detailedReport.payment_breakdown.length === 0 ? (
+              <p className="text-stone-500 text-sm">
+                No paid appointments for these filters.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-stone-50 text-left">
+                      <th className="px-3 py-2 font-semibold text-stone-700">Payment Method</th>
+                      <th className="px-3 py-2 font-semibold text-stone-700">Service Income</th>
+                      <th className="px-3 py-2 font-semibold text-stone-700">Tips</th>
+                      <th className="px-3 py-2 font-semibold text-stone-700">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailedReport.payment_breakdown.map((row) => (
+                      <tr key={row.payment_type} className="border-t border-stone-100">
+                        <td className="px-3 py-2">{row.payment_type}</td>
+                        <td className="px-3 py-2">${parseFloat(row.price_total || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2">${parseFloat(row.tip_total || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 font-semibold">${parseFloat(row.total || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -1966,6 +2036,19 @@ const NailsByBrooke = () => {
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--blush)]"
                   rows="3"
                 />
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={clientForm.is_one_time_client}
+                    onChange={(e) =>
+                      setClientForm({ ...clientForm, is_one_time_client: e.target.checked })
+                    }
+                    className="w-4 h-4 accent-[var(--blush)]"
+                  />
+                  <span className="text-stone-700 text-sm">
+                    One-time client
+                  </span>
+                </label>
                 <button
                   onClick={editingId ? updateClient : addClient}
                   disabled={!clientForm.name.trim()}
@@ -2184,6 +2267,11 @@ const NailsByBrooke = () => {
 
             {modalType === 'clientDetails' && selectedClient && (
               <div className="space-y-3">
+                {selectedClient.is_one_time_client && (
+                  <span className="inline-block text-xs px-2 py-1 rounded-full border bg-amber-50 border-amber-200 text-amber-700">
+                    One-time client
+                  </span>
+                )}
                 <p className="text-sm text-stone-600">
                   <span className="font-semibold">Phone:</span>{' '}
                   {selectedClient.phone}
@@ -2214,6 +2302,7 @@ const NailsByBrooke = () => {
                       phone: selectedClient.phone || '',
                       email: selectedClient.email || '',
                       notes: selectedClient.notes || '',
+                      is_one_time_client: !!selectedClient.is_one_time_client,
                     });
                   }}
                   className="mt-4 w-full bg-[var(--blush)] text-white py-2 rounded-full hover:bg-[var(--blush-dark)] font-medium"

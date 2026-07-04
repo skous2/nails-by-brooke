@@ -12,7 +12,7 @@ router.use(authMiddleware);
 router.get('/', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, name, phone, email, notes, created_at, updated_at FROM clients WHERE user_id = $1 ORDER BY name ASC',
+      'SELECT id, name, phone, email, notes, is_one_time_client, created_at, updated_at FROM clients WHERE user_id = $1 ORDER BY name ASC',
       [req.user.id]
     );
 
@@ -35,7 +35,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const result = await db.query(
-      'SELECT id, name, phone, email, notes, created_at, updated_at FROM clients WHERE id = $1 AND user_id = $2',
+      'SELECT id, name, phone, email, notes, is_one_time_client, created_at, updated_at FROM clients WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
 
@@ -65,7 +65,8 @@ router.post('/',
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('phone').optional({ checkFalsy: true }).trim(),
     body('email').optional({ checkFalsy: true }).isEmail().withMessage('Email must be valid').normalizeEmail(),
-    body('notes').optional({ checkFalsy: true }).trim()
+    body('notes').optional({ checkFalsy: true }).trim(),
+    body('is_one_time_client').optional().isBoolean()
   ],
   async (req, res) => {
     try {
@@ -79,15 +80,16 @@ router.post('/',
         });
       }
 
-      let { name, phone, email, notes } = req.body;
+      let { name, phone, email, notes, is_one_time_client } = req.body;
 
       phone = phone === '' ? null : phone;
       email = email === '' ? null : email;
       notes = notes === '' ? null : notes;
+      is_one_time_client = !!is_one_time_client;
 
       const result = await db.query(
-        'INSERT INTO clients (user_id, name, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, phone, email, notes, created_at, updated_at',
-        [req.user.id, name, phone, email, notes]
+        'INSERT INTO clients (user_id, name, phone, email, notes, is_one_time_client) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, phone, email, notes, is_one_time_client, created_at, updated_at',
+        [req.user.id, name, phone, email, notes, is_one_time_client]
       );
 
       res.status(201).json({
@@ -110,7 +112,8 @@ router.put('/:id',
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('phone').optional({ checkFalsy: true }).trim(),
     body('email').optional({ checkFalsy: true }).isEmail().withMessage('Email must be valid').normalizeEmail(),
-    body('notes').optional({ checkFalsy: true }).trim()
+    body('notes').optional({ checkFalsy: true }).trim(),
+    body('is_one_time_client').optional().isBoolean()
   ],
   async (req, res) => {
     try {
@@ -125,7 +128,7 @@ router.put('/:id',
       }
 
       const { id } = req.params;
-      const { name, phone, email, notes } = req.body;
+      const { name, phone, email, notes, is_one_time_client } = req.body;
 
       // Check if client exists and belongs to user
       const checkResult = await db.query(
@@ -142,8 +145,8 @@ router.put('/:id',
 
       // Update client
       const result = await db.query(
-        'UPDATE clients SET name = $1, phone = $2, email = $3, notes = $4 WHERE id = $5 AND user_id = $6 RETURNING id, name, phone, email, notes, created_at, updated_at',
-        [name, phone, email || null, notes || null, id, req.user.id]
+        'UPDATE clients SET name = $1, phone = $2, email = $3, notes = $4, is_one_time_client = $5 WHERE id = $6 AND user_id = $7 RETURNING id, name, phone, email, notes, is_one_time_client, created_at, updated_at',
+        [name, phone, email || null, notes || null, !!is_one_time_client, id, req.user.id]
       );
 
       res.json({

@@ -24,6 +24,39 @@ function getYearFromQuery(queryYear) {
   return now.getFullYear();
 }
 
+// Payment-method breakdown (cash vs. card vs. Venmo, etc.) for a given
+// year, optionally scoped to a single client — mirrors the summary
+// report's breakdown so the detailed/per-client report can show it too.
+async function getPaymentBreakdown(userId, year, clientId) {
+  const params = [userId, year];
+  let clientFilter = '';
+  if (clientId) {
+    params.push(clientId);
+    clientFilter = 'AND a.client_id = $3';
+  }
+
+  const result = await db.query(
+    `
+    SELECT
+      ap.payment_type,
+      SUM(ap.amount_price)::numeric(10,2) AS price_total,
+      SUM(ap.amount_tip)::numeric(10,2) AS tip_total,
+      SUM(ap.amount_price + ap.amount_tip)::numeric(10,2) AS total
+    FROM appointment_payments ap
+    JOIN appointments a ON a.id = ap.appointment_id
+    WHERE a.user_id = $1
+      AND a.paid = true
+      AND EXTRACT(YEAR FROM a.appointment_date) = $2
+      ${clientFilter}
+    GROUP BY ap.payment_type
+    ORDER BY ap.payment_type;
+    `,
+    params
+  );
+
+  return result.rows;
+}
+
 // ============================
 // SUMMARY REPORT (JSON + PDF)
 // ============================
@@ -447,12 +480,15 @@ router.get('/detailed', auth, async (req, res) => {
       clientName = detailedResult.rows[0].client_name;
     }
 
+    const paymentBreakdown = await getPaymentBreakdown(userId, year, clientId);
+
     res.json({
       success: true,
       year,
       client_id: clientId,
       client_name: clientName,
       appointments: detailedResult.rows,
+      payment_breakdown: paymentBreakdown,
       totals: {
         service_total: serviceTotal.toFixed(2),
         tip_total: tipTotal.toFixed(2),
@@ -519,6 +555,8 @@ router.get('/detailed/pdf', auth, async (req, res) => {
     if (clientId && detailedResult.rows.length > 0) {
       clientName = detailedResult.rows[0].client_name;
     }
+
+    const paymentBreakdown = await getPaymentBreakdown(userId, year, clientId);
 
     // PDF Setup
     const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
@@ -665,6 +703,43 @@ router.get('/detailed/pdf', auth, async (req, res) => {
     y += 14;
     doc.text(`Total: $${fmt(grandTotal)}`, 40, y);
 
+    // Payment method breakdown (for tax purposes)
+    y += 26;
+    if (y > doc.page.height - 100) {
+      doc.addPage();
+      y = 40;
+    }
+
+    doc.font('Helvetica-Bold').fontSize(13).text('Payment Method Breakdown', 40, y);
+    y += 20;
+
+    if (!paymentBreakdown || paymentBreakdown.length === 0) {
+      doc.font('Helvetica').fontSize(11).text('No paid appointments for this year.', 40, y);
+      y += 14;
+    } else {
+      const bColX = { method: 40, price: 220, tip: 340, total: 460 };
+
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text('Payment Method', bColX.method, y);
+      doc.text('Price', bColX.price, y, { width: 80, align: 'right' });
+      doc.text('Tips', bColX.tip, y, { width: 80, align: 'right' });
+      doc.text('Total', bColX.total, y, { width: 80, align: 'right' });
+      y += 16;
+
+      doc.font('Helvetica').fontSize(10);
+      paymentBreakdown.forEach((row) => {
+        if (y > doc.page.height - 60) {
+          doc.addPage();
+          y = 60;
+        }
+        doc.text(row.payment_type, bColX.method, y);
+        doc.text(`$${fmt(row.price_total)}`, bColX.price, y, { width: 80, align: 'right' });
+        doc.text(`$${fmt(row.tip_total)}`, bColX.tip, y, { width: 80, align: 'right' });
+        doc.text(`$${fmt(row.total)}`, bColX.total, y, { width: 80, align: 'right' });
+        y += 14;
+      });
+    }
+
     y += 20;
 
     doc
@@ -722,6 +797,8 @@ router.get('/detailed/csv', auth, async (req, res) => {
       params
     );
 
+    const paymentBreakdown = await getPaymentBreakdown(userId, year, clientId);
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader(
       'Content-Disposition',
@@ -769,6 +846,22 @@ router.get('/detailed/csv', auth, async (req, res) => {
           total.toFixed(2),
           row.paid ? 'Yes' : 'No',
           `"${notes}"`,
+        ].join(',')
+      );
+    });
+
+    // Payment method breakdown (for tax purposes)
+    lines.push('');
+    lines.push('Payment Method Breakdown');
+    lines.push(['Payment Method', 'Price', 'Tip', 'Total'].join(','));
+    paymentBreakdown.forEach((row) => {
+      const method = (row.payment_type || '').replace(/"/g, '""');
+      lines.push(
+        [
+          `"${method}"`,
+          parseFloat(row.price_total || 0).toFixed(2),
+          parseFloat(row.tip_total || 0).toFixed(2),
+          parseFloat(row.total || 0).toFixed(2),
         ].join(',')
       );
     });
